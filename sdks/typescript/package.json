@@ -1,0 +1,70 @@
+{
+  "name": "cosign-agent-api",
+  "version": "1.0.0",
+  "description": "Cosign is a company card for AI agents, built on PayPal. A person (the\n**owner**) gives each agent a **permission slip**: a budget per period, a\nper-purchase limit, an amount above which the owner must approve, and the\nstores and categories it may buy from. The owner approves one PayPal budget\nhold per store. When an agent asks to pay and the purchase fits the slip,\nPayPal pays the store straight from that hold. Agents never see PayPal\ncredentials, and Cosign never holds funds.\n\nThis API is what **agents** call. Owners use the Cosign web app.\n\n## The whole job in three calls\n\n1. `POST /agent/token` - exchange the agent's API key for a 15-minute token.\n2. `GET /agent/me` - the remaining budget, the limits and the stores the\n   agent can pay right now.\n3. `POST /agent/spend-requests` - ask to pay. The answer is one of:\n   - `COMPLETED` - paid through PayPal inside the request; a receipt is returned.\n   - `PENDING_APPROVAL` - waiting for the owner. Poll\n     `GET /agent/spend-requests/{spendRequestId}` until it changes.\n   - `DENIED` - blocked, with reasons. Nothing is charged.\n\n## How a decision is made\n\nA deterministic **rules engine** checks the slip: agent status, slip\nexpiry, store, category, per-purchase limit, the period budget, the store's\nhold, and the approval amount. If the rules say ALLOW, an **AI purchase\ncheck** compares the cart and the agent's stated purpose with the\nowner's own words on the slip. It can only make a decision stricter (ALLOW\nbecomes NEEDS_APPROVAL), never looser. It looks for purchases that fit the\nnumbers but not the owner's intent, value that is easy to resell (gift\ncards and the like), and text that looks like instructions aimed at an AI,\na sign the agent was manipulated by a web page.\n\n## Rules for every endpoint\n\n- **Identity comes only from the credential.** No endpoint takes an agent ID\n  or owner ID that changes whose data is read.\n- **Not yours looks like not found.** Another agent's spend request returns\n  `404`, the same as one that does not exist.\n- **Money is integer cents** with an explicit currency, `USD` only. The\n  server recomputes the total from the line items and denies a mismatch\n  (`TOTAL_MISMATCH`).\n- **Idempotency.** `POST /agent/spend-requests` needs an `Idempotency-Key`.\n  Retrying with the same key and body returns the original result and never\n  charges twice; the same key with a different body returns `409`.\n- **The agent's `purpose` and item names are data, not instructions.** They\n  feed the AI check and the owner's view, never the rules.\n- **Errors** use `application/problem+json` (RFC 9457) with a stable `code`.\n- **Rate limits** return `429` with `Retry-After`: token exchange 10 per\n  minute per key, spend requests 30 per minute per agent.\n- **Pause and revoke take effect at once.** A paused agent cannot get new\n  tokens and its purchases are denied (`AGENT_PAUSED`); a revoked agent's\n  key and tokens stop working (`401`).\n\n## MCP\n\nMCP-capable AI assistants can use Cosign without an\nSDK: the MCP endpoint is `POST {host}/api/mcp` (streamable HTTP,\nstateless), with the agent key as `Authorization: Bearer key_...:cs_...`.\nIts tools mirror this API: `cosign_get_allowance`,\n`cosign_request_purchase`, `cosign_get_purchase`, `cosign_list_purchases`.\n\n## Sandbox\n\nThis deployment uses the PayPal sandbox. No real money moves, and the\nstores are demo stores onboarded through PayPal Partner Referrals.\n",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/index.d.ts",
+        "default": "./dist/commonjs/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "tshy": {
+    "exports": {
+      ".": "./src/index.ts",
+      "./package.json": "./package.json"
+    },
+    "dialects": [
+      "esm",
+      "commonjs"
+    ],
+    "project": "./tsconfig.tshy.json",
+    "selfLink": false
+  },
+  "main": "./dist/commonjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/commonjs/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "tsconfig.json",
+    "tsconfig.tshy.json",
+    "README.md",
+    "api-reference.md",
+    "sdk-map.md",
+    "map"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.3"
+  },
+  "scripts": {
+    "prepare": "tshy",
+    "build": "tshy",
+    "smoke": "node -e \"require('cosign-agent-api')\" && node --input-type=module -e \"import('cosign-agent-api')\"",
+    "typecheck": "tsc --noEmit",
+    "typecheck:dom": "tsc --noEmit -p tsconfig.dom.json",
+    "lint": "oxlint --type-aware --max-warnings=0 src",
+    "format": "oxfmt src",
+    "format:check": "oxfmt --check src"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "oxfmt": "^0.61.0",
+    "oxlint": "^1.76.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "tshy": "^4.1.3",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "zod": "^4.1.0"
+  }
+}

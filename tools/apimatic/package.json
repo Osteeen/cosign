@@ -1,0 +1,11 @@
+{
+  "name": "cosign-apimatic-tools",
+  "private": true,
+  "description": "APIMatic CLI for Cosign's docs portal, SDKs and Context Plugin. Needs Node 24 (see .nvmrc); kept out of the app.",
+  "scripts": {
+    "apimatic": "apimatic"
+  },
+  "dependencies": {
+    "@apimatic/cli": "2.0.0-beta.5"
+  }
+}

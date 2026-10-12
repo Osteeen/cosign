@@ -1,0 +1,22 @@
+# Cosign's daily job: period roll-over, renewal reminders, expired approvals and
+# budget-hold renewals. Calls the deployed app; needs two repository secrets:
+# COSIGN_APP_URL (e.g. https://cosign.onrender.com) and COSIGN_JOB_SECRET (the
+# JOB_SECRET value from Render).
+name: Daily job
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+permissions: {}
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call /api/jobs/daily
+        env:
+          APP_URL: ${{ secrets.COSIGN_APP_URL }}
+          JOB_SECRET: ${{ secrets.COSIGN_JOB_SECRET }}
+        run: |
+          test -n "$APP_URL" && test -n "$JOB_SECRET" || { echo "Set COSIGN_APP_URL and COSIGN_JOB_SECRET"; exit 1; }
+          curl -fsS --retry 3 --retry-delay 20 --max-time 120 -X POST "$APP_URL/api/jobs/daily" -H "Authorization: Bearer $JOB_SECRET"

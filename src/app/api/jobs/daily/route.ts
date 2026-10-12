@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { problem } from "@/lib/api";
 import { runDailyJob } from "@/lib/services/jobs";
 
-// Called once a day by a scheduler (a Railway cron service) with
+// Called once a day by a scheduler (GitHub Actions, daily) with
 //   Authorization: Bearer <JOB_SECRET>
 // Anyone without the secret gets 401 and nothing runs.
 export async function POST(request: Request) {

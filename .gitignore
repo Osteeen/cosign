@@ -32,3 +32,6 @@ scripts/demo/.channel3-cache.json
 
 # Sponsor reference PDF (third-party, not ours to publish)
 APIMatic Context Plugins for PayPal - Getting Started.pdf
+
+# APIMatic: local build output (docs-portal/ and sdks/ at the root are the committed copies)
+tools/apimatic/build/

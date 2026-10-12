@@ -35,7 +35,7 @@ Agents never see PayPal credentials, and Cosign never holds funds.
 | **Claude** (Anthropic) | Claude Haiku 4.5 for the AI purchase check and market-price comparison; Claude Sonnet for drafting rules from the owner's words and for the demo bot's planning |
 | **AG Grid** + **AG Charts** (Community) | The live spending grid and charts |
 | **Channel3** | Product search for market prices, in the owner's approval view and the demo bot |
-| **Railway** | Hosting, Postgres and the daily job (deploy in progress) |
+| **Render** | Hosting the app, Postgres and the APIMatic docs portal (deploy in progress); the daily job runs from GitHub Actions |
 | Next.js, TypeScript, PostgreSQL, Drizzle ORM, Auth.js, Resend | The app itself |
 
 ## Run it locally

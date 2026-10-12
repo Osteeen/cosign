@@ -1,0 +1,45 @@
+# Docs
+
+- Home
+  - [Cosign Agent API](/): Let your AI agents pay stores through PayPal, within rules you co-sign.
+- Context Plugin
+  - [Context Plugin](/context-plugin): Give your AI coding assistant working knowledge of this API's SDKs.
+- SDKs
+  - [SDKs](/sdks): Client libraries for this API.
+  - [C# SDK](/sdks/csharp): Install and start using the C# SDK.
+  - [TypeScript SDK](/sdks/typescript): Install and start using the TypeScript SDK.
+  - [Python SDK](/sdks/python): Install and start using the Python SDK.
+- API Reference
+  - Authentication: Exchange the agent's API key for a short-lived token.
+    - [Get an access token](/api/openapi/authentication/createToken): Send the agent's API key with HTTP Basic auth. The key looks like
+`key_<24 hex>:cs_<secret>`: the part before the colon is the username,
+the part after is the password. The owner sees the key once, when the
+agent is added.
+
+Tokens last 15 minutes (`expires_in: 900`). Get a new one when a call
+returns `401`. A paused or revoked agent cannot get a token.
+  - Agent: This agent's allowance - what it may spend right now.
+    - [Get the agent's allowance](/api/openapi/agent/getAllowance): The agent's active permission slip: what is left this period, the
+limits, the allowed categories, and the stores it can pay right now
+(only stores whose PayPal budget hold the owner has approved). Call this
+before planning a purchase. `slip` is `null` when the agent has no
+active slip yet.
+  - Spend requests: Ask to pay a store, and follow up on earlier requests.
+    - [List the agent's spend requests](/api/openapi/spend-requests/listSpendRequests): This agent's own requests, newest first. Not paginated yet; `next_cursor` is always `null` in this version.
+    - [Ask to pay a store](/api/openapi/spend-requests/createSpendRequest): Cosign checks the purchase against the slip and answers inside this
+request:
+
+- **Paid** (`status: COMPLETED`) - the rules allowed it and the AI check
+  raised nothing. PayPal captured the total from the store's budget
+  hold; `receipt` is filled in.
+- **Waiting for the owner** (`status: PENDING_APPROVAL`) - over the
+  owner's approval amount, or flagged by the AI check. The owner is
+  emailed. Poll `GET /agent/spend-requests/{spendRequestId}`; the owner
+  approves the exact cart (then it is paid), declines it, or lets it
+  expire after 24 hours.
+- **Blocked** (`status: DENIED`) - see `decision.reasons`. Nothing is charged.
+
+If PayPal does not answer in time the request stays `PROCESSING`;
+poll it, and Cosign finishes the capture with the same PayPal request
+ID, so it is never charged twice.
+    - [Get a spend request](/api/openapi/spend-requests/getSpendRequest): One of this agent's requests. Poll it while it is `PENDING_APPROVAL` or `PROCESSING` (every few seconds is fine).

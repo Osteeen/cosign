@@ -1,0 +1,63 @@
+# Render Blueprint for Cosign (PayPal SANDBOX only). No secrets in this file:
+# secret values are entered in the Render dashboard (sync: false) or generated.
+# Lean on purpose (shared hackathon credit): the web service starts on the free
+# plan and moves to Starter for judging (~Nov 25, so it does not sleep); the
+# database is paid because free Postgres is deleted ~30 days after creation;
+# the daily job runs from GitHub Actions (.github/workflows/daily-job.yml).
+# Check exact prices in the Render dashboard before applying.
+services:
+  - type: web
+    name: cosign
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    # Free instances have no pre-deploy step: migrations and the store seed are
+    # idempotent and run at start.
+    startCommand: pnpm db:migrate:deploy && pnpm db:seed:deploy && pnpm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22.22.2"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cosign-db
+          property: connectionString
+      - key: APP_URL # the public https URL of this service, no trailing slash
+        sync: false
+      - key: AUTH_URL # same as APP_URL
+        sync: false
+      - key: AUTH_TRUST_HOST
+        value: "true"
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: JOB_SECRET # also stored as a GitHub Actions secret for the daily job
+        generateValue: true
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_PARTNER_MERCHANT_ID
+        sync: false
+      - key: AUTH_RESEND_KEY
+        sync: false
+      - key: AUTH_EMAIL_FROM
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CHANNEL3_API_KEY
+        sync: false
+      - key: DEMO_LOGIN
+        value: "on"
+
+  # The APIMatic docs portal (static, generated into docs-portal/).
+  - type: web
+    name: cosign-docs
+    runtime: static
+    staticPublishPath: docs-portal
+    buildCommand: "true"
+
+databases:
+  - name: cosign-db
+    plan: basic-256mb
+    databaseName: cosign
+    user: cosign

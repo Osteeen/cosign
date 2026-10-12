@@ -1,0 +1,48 @@
+{
+  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@beta/apimatic.schema.json",
+  "schemaVersion": 1,
+  "portal": {
+    "site": {
+      "description": "Let your AI agents pay stores through PayPal, within rules you co-sign.",
+      "name": "Agent API"
+    },
+    "brand": {
+      "logo": {
+        "light": "static/images/cosign-logo.svg",
+        "dark": "static/images/cosign-logo-dark.svg"
+      },
+      "favicon": "static/images/favicon.ico",
+      "colors": {
+        "primary": {
+          "light": "#17704a",
+          "dark": "#5fcf98"
+        }
+      },
+      "colorMode": "both"
+    },
+    "navigation": {
+      "links": [
+        {
+          "label": "GitHub",
+          "url": "https://github.com/Osteeen/cosign"
+        }
+      ]
+    },
+    "ai": {
+      "pageActions": true
+    }
+  },
+  "plugin": {
+    "pluginId": "cosign",
+    "pluginName": "Cosign",
+    "pluginVersion": "0.1.0",
+    "license": "MIT",
+    "homepage": "https://github.com/Osteeen/cosign",
+    "repository": "https://github.com/Osteeen/cosign"
+  },
+  "languages": {
+    "csharp": {},
+    "typescript": {},
+    "python": {}
+  }
+}
