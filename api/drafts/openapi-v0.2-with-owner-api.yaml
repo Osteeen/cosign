@@ -1,0 +1,1526 @@
+# DRAFT v0.2 (Oct 9 2026), kept for reference. The owner endpoints below were
+# NOT built as a REST API: the dashboard uses Next.js server actions instead.
+# The published spec is ../openapi.yaml (Agent API only).
+
+openapi: 3.1.0
+info:
+  title: Cosign API
+  version: 0.2.0-draft
+  summary: Spending controls for AI agents, paid through PayPal.
+  description: |
+    Cosign lets a person give each AI agent a permission slip - a budget, limits,
+    allowed stores and an expiry - and pays stores through PayPal only when a
+    purchase fits the slip.
+
+    **Two audiences, two auth schemes**
+
+    - **Agent API** (`/v1/agent/...`) - called by AI agents through the Cosign SDKs
+      or the Cosign MCP server. Auth: a short-lived agent token (`agentToken`),
+      obtained by exchanging the agent's API key at `POST /v1/agent/token`.
+    - **Owner API** (everything else) - called by the Cosign dashboard on behalf of
+      a signed-in person. Auth: the owner's session (`ownerSession`).
+
+    **Money model: budget hold.** A slip's budget covers one period of at most 28
+    days and is split across its stores (the owner sets each store's share; the
+    default is an even split). For each store the owner approves one PayPal hold
+    for that share (an authorization with the store as payee). Each allowed agent
+    purchase is a partial capture against that hold, paid by PayPal straight to
+    the store. Before a period ends the owner gets a one-tap renewal prompt for the
+    next one. Revoking an agent or ending a slip releases what is left. Cosign
+    never holds funds and agents never see PayPal credentials.
+
+    **Rules that apply to every endpoint**
+
+    - Identity comes only from the credential. No endpoint accepts an owner ID or
+      agent ID that changes whose data is read or written.
+    - A resource that exists but belongs to someone else returns `404`, the same
+      as one that does not exist.
+    - Money is always integer minor units (cents) with an explicit currency.
+      Only `USD` in this version.
+    - Every POST that can move money or change permissions requires an
+      `Idempotency-Key` header. Replaying the same key with the same body returns
+      the original result; the same key with a different body returns `409`.
+    - Errors use `application/problem+json` (RFC 9457) with a stable `code`.
+    - Rate limits return `429` with `Retry-After`.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: https://api.cosign.example/v1
+    description: Placeholder - set when deployed on Render (sandbox PayPal only)
+tags:
+  - name: Agent auth
+    description: Exchange an agent API key for a short-lived token.
+  - name: Agent spending
+    description: What an agent calls to learn its limits and to pay.
+  - name: Agents
+    description: Owner manages agents and their keys.
+  - name: Permission slips
+    description: Owner turns plain English into rules and grants them to an agent.
+  - name: Budget holds
+    description: The PayPal holds that fund a slip, one per store.
+  - name: Approvals
+    description: Purchases above the approval threshold wait for the owner.
+  - name: Activity
+    description: Append-only log of requests, decisions, payments and changes.
+  - name: Stores
+    description: Stores onboarded to Cosign through PayPal Partner Referrals.
+  - name: PayPal callbacks
+    description: Internal endpoints PayPal calls. Not part of the SDKs.
+
+security:
+  - ownerSession: []
+
+paths:
+  # ------------------------------------------------------------------ Agent API
+  /agent/token:
+    post:
+      tags: [Agent auth]
+      operationId: createAgentToken
+      summary: Exchange an agent API key for a short-lived token
+      description: |
+        Send the agent key as HTTP Basic credentials (`key_id:key_secret`).
+        Tokens last 15 minutes. A paused or revoked agent gets `401`.
+      security:
+        - agentKey: []
+      responses:
+        "200":
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentToken"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /agent/me:
+    get:
+      tags: [Agent spending]
+      operationId: getAgentAllowance
+      summary: What this agent may spend right now
+      description: |
+        Returns the agent's active slip, remaining budget for the period and the
+        stores it can pay (only stores with an active hold). Agents should call
+        this before planning a purchase.
+      security:
+        - agentToken: []
+      responses:
+        "200":
+          description: Current allowance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentAllowance"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /agent/spend-requests:
+    post:
+      tags: [Agent spending]
+      operationId: createSpendRequest
+      summary: Ask to pay a store
+      description: |
+        The rules engine decides `ALLOW`, `NEEDS_APPROVAL` or `DENY`; the AI
+        intent check can only make that stricter.
+
+        - `ALLOW` - Cosign captures the amount from the store's hold inside this
+          request (PayPal-Request-Id derived from the spend request ID, so a retry
+          never charges twice) and returns status `COMPLETED` with a receipt.
+          PayPal webhooks reconcile the result afterwards.
+        - `NEEDS_APPROVAL` - status `PENDING_APPROVAL`; poll
+          `GET /v1/agent/spend-requests/{spendRequestId}` until it is approved
+          (then paid) or denied or expired.
+        - `DENY` - status `DENIED` with reasons. Nothing is charged.
+
+        The server recomputes the total from the line items; a mismatch is
+        denied with `TOTAL_MISMATCH`.
+      security:
+        - agentToken: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpendRequestCreate"
+      responses:
+        "201":
+          description: Request created and decided
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpendRequest"
+        "200":
+          description: Idempotent replay of an earlier request with the same key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpendRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/IdempotencyConflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    get:
+      tags: [Agent spending]
+      operationId: listSpendRequests
+      summary: This agent's own spend requests, newest first
+      security:
+        - agentToken: []
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/SpendRequestStatus"
+      responses:
+        "200":
+          description: A page of spend requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpendRequestPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /agent/spend-requests/{spendRequestId}:
+    get:
+      tags: [Agent spending]
+      operationId: getSpendRequest
+      summary: One of this agent's spend requests
+      security:
+        - agentToken: []
+      parameters:
+        - $ref: "#/components/parameters/SpendRequestId"
+      responses:
+        "200":
+          description: The spend request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpendRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ------------------------------------------------------------------ Owner API
+  /agents:
+    get:
+      tags: [Agents]
+      operationId: listAgents
+      summary: The owner's agents
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of agents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Agents]
+      operationId: createAgent
+      summary: Register an agent and issue its first API key
+      description: The key secret is returned once and never again. Cosign stores only its hash.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentCreate"
+      responses:
+        "201":
+          description: Agent created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentWithNewKey"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /agents/{agentId}:
+    get:
+      tags: [Agents]
+      operationId: getAgent
+      summary: One agent
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: The agent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Agents]
+      operationId: updateAgent
+      summary: Rename, pause or resume an agent
+      description: |
+        Pausing blocks new spend requests at once (`AGENT_PAUSED`) but keeps holds
+        in place. Use `revokeAgent` to stop for good and release holds.
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentUpdate"
+      responses:
+        "200":
+          description: Updated agent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /agents/{agentId}/revoke:
+    post:
+      tags: [Agents]
+      operationId: revokeAgent
+      summary: Revoke an agent - one click, permanent
+      description: |
+        Invalidates every key and token for the agent, ends its slips, denies its
+        pending approvals and releases (voids) the rest of every hold. Already
+        captured payments are not refunded; use the store's refund flow for that.
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Agent revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevokeResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /agents/{agentId}/keys:
+    post:
+      tags: [Agents]
+      operationId: createAgentKey
+      summary: Issue an additional key (for rotation)
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: New key; the secret is shown once
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewAgentKey"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /agents/{agentId}/keys/{keyId}:
+    delete:
+      tags: [Agents]
+      operationId: deleteAgentKey
+      summary: Revoke one key
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^key_[A-Za-z0-9]{16,32}$"
+      responses:
+        "204":
+          description: Key revoked
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /slips/drafts:
+    post:
+      tags: [Permission slips]
+      operationId: draftSlip
+      summary: Turn plain English into proposed rules (AI)
+      description: |
+        Claude reads the owner's words and proposes strict rules plus any
+        questions it could not resolve. Nothing is saved or granted; the owner
+        reviews the draft and calls `createSlip` with the rules they confirm.
+        Values the model could not infer are left null and listed in `questions`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SlipDraftRequest"
+      responses:
+        "200":
+          description: Proposed rules for review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlipDraft"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /agents/{agentId}/slips:
+    post:
+      tags: [Permission slips]
+      operationId: createSlip
+      summary: Grant confirmed rules to an agent and open its budget holds
+      description: |
+        Creates the slip and one budget hold per allowed store for the first
+        period, each waiting for the owner's PayPal approval (`approval_url`).
+        Each hold is that store's share of `period_budget_cents`: taken from
+        `hold_allocations` when given, otherwise an even split (leftover cents go
+        to the first stores). The shares must add up to no more than the period
+        budget. The slip becomes `ACTIVE` when at least one hold is approved. An
+        agent has at most one active slip; creating a new one ends the previous
+        one and releases its holds.
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SlipCreate"
+      responses:
+        "201":
+          description: Slip created; holds await approval
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Slip"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/IdempotencyConflict"
+
+  /slips/{slipId}:
+    get:
+      tags: [Permission slips]
+      operationId: getSlip
+      summary: One slip with its holds and spend so far
+      parameters:
+        - $ref: "#/components/parameters/SlipId"
+      responses:
+        "200":
+          description: The slip
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Slip"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /slips/{slipId}/end:
+    post:
+      tags: [Permission slips]
+      operationId: endSlip
+      summary: End a slip early and release its holds
+      parameters:
+        - $ref: "#/components/parameters/SlipId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Slip ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Slip"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /holds/{holdId}:
+    get:
+      tags: [Budget holds]
+      operationId: getHold
+      summary: One budget hold
+      parameters:
+        - $ref: "#/components/parameters/HoldId"
+      responses:
+        "200":
+          description: The hold
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hold"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /slips/{slipId}/renew:
+    post:
+      tags: [Permission slips]
+      operationId: renewSlip
+      summary: Start the next budget period (the one-tap renewal)
+      description: |
+        Opens new holds for the next period, using the same rules and per-store
+        shares, and returns them with their `approval_url`s. Old holds are
+        released once the new ones are approved, so the owner never has two
+        periods held at once for long. The dashboard prompts for this before
+        `current_period_ends_at`. Fails with `409` if the slip has ended or its
+        `expires_at` is before the next period starts. (Reauthorizing a hold
+        inside its 29-day life happens automatically and needs no call.)
+      parameters:
+        - $ref: "#/components/parameters/SlipId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Next period's holds, awaiting approval
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Slip"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /approvals:
+    get:
+      tags: [Approvals]
+      operationId: listApprovals
+      summary: Purchases waiting for the owner
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ApprovalStatus"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of approvals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalPage"
+
+  /approvals/{approvalId}/approve:
+    post:
+      tags: [Approvals]
+      operationId: approvePurchase
+      summary: Approve exactly this cart and amount
+      description: |
+        The body must echo the `cart_hash` and amount shown to the owner. If the
+        request changed since, or the approval expired, the call fails with `409`
+        and nothing is charged. On success Cosign captures from the hold.
+      parameters:
+        - $ref: "#/components/parameters/ApprovalId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovalDecision"
+      responses:
+        "200":
+          description: Approved and paid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approval"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /approvals/{approvalId}/deny:
+    post:
+      tags: [Approvals]
+      operationId: denyPurchase
+      summary: Deny a pending purchase
+      parameters:
+        - $ref: "#/components/parameters/ApprovalId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approval"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /activity:
+    get:
+      tags: [Activity]
+      operationId: listActivity
+      summary: The owner's activity log, newest first
+      parameters:
+        - name: agent_id
+          in: query
+          description: Filter to one of the owner's agents.
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/ActivityType"
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of activity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityPage"
+
+  /stores:
+    get:
+      tags: [Stores]
+      operationId: listStores
+      summary: Stores agents can be allowed to pay
+      responses:
+        "200":
+          description: Onboarded stores
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Store"
+
+  # ------------------------------------------------------- PayPal callbacks
+  /paypal/hold-return:
+    get:
+      tags: [PayPal callbacks]
+      operationId: paypalHoldReturn
+      summary: Owner returns from approving a hold in PayPal
+      description: |
+        PayPal redirects the owner's browser here. Cosign checks the PayPal order
+        belongs to a hold of the signed-in owner, places the authorization, then
+        redirects to the dashboard. Never trusts query parameters alone.
+      x-internal: true
+      parameters:
+        - name: token
+          in: query
+          required: true
+          description: PayPal order ID
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "302":
+          description: Redirect to the dashboard
+
+  /paypal/webhooks:
+    post:
+      tags: [PayPal callbacks]
+      operationId: paypalWebhook
+      summary: PayPal webhook receiver
+      description: |
+        Every event is verified with PayPal's signature verification before its
+        body is used; unverified events get `400` and are logged. Events are
+        processed idempotently by PayPal event ID.
+      x-internal: true
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Accepted
+        "400":
+          description: Signature verification failed
+
+components:
+  securitySchemes:
+    agentKey:
+      type: http
+      scheme: basic
+      description: Agent API key as `key_id:key_secret`. Only for `POST /v1/agent/token`.
+    agentToken:
+      type: http
+      scheme: bearer
+      description: Short-lived agent token from `POST /v1/agent/token`.
+    ownerSession:
+      type: apiKey
+      in: cookie
+      name: cosign_session
+      description: |
+        The signed-in owner's session (dashboard only). Owners sign in with an
+        emailed one-time link (passwordless, Auth.js email provider); the sign-in
+        routes belong to Auth.js and are not part of this API. The sandbox
+        deployment also has a seeded demo owner for judges.
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Unique per logical operation. Reuse it only to retry the same request.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 64
+        pattern: "^[A-Za-z0-9_-]+$"
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor from the previous page's `next_cursor`.
+      schema:
+        type: string
+        maxLength: 256
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    AgentId:
+      name: agentId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Id"
+    SlipId:
+      name: slipId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Id"
+    HoldId:
+      name: holdId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Id"
+    ApprovalId:
+      name: approvalId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Id"
+    SpendRequestId:
+      name: spendRequestId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Id"
+
+  responses:
+    BadRequest:
+      description: The request is malformed or fails validation
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Unauthorized:
+      description: Missing, invalid or expired credential, or the agent is paused or revoked
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NotFound:
+      description: Not found, or not yours (the two look the same on purpose)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Conflict:
+      description: The resource is not in a state that allows this action
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    IdempotencyConflict:
+      description: This Idempotency-Key was already used with a different request body
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    RateLimited:
+      description: Too many requests
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+
+  schemas:
+    Id:
+      type: string
+      format: uuid
+
+    Currency:
+      type: string
+      enum: [USD]
+
+    Money:
+      type: object
+      required: [amount_cents, currency]
+      properties:
+        amount_cents:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 10000000
+          description: Integer minor units. 1234 = $12.34.
+        currency:
+          $ref: "#/components/schemas/Currency"
+      additionalProperties: false
+
+    Category:
+      type: string
+      description: Purchase categories a slip can allow. Kept small on purpose.
+      enum:
+        - office_supplies
+        - groceries
+        - food_and_drink
+        - travel
+        - software
+        - electronics
+        - household
+        - other
+
+    PeriodDays:
+      type: integer
+      minimum: 1
+      maximum: 28
+      description: Length of one budget period in days. At most 28 so a period fits inside one 29-day PayPal hold. No calendar months.
+
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+          description: Stable machine-readable error code, e.g. `idempotency_key_reused`.
+        detail:
+          type: string
+        request_id:
+          type: string
+
+    # ----------------------------------------------------------- agent auth
+    AgentToken:
+      type: object
+      required: [access_token, token_type, expires_in]
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_in:
+          type: integer
+          description: Seconds. 900 in this version.
+
+    # -------------------------------------------------------------- agents
+    AgentStatus:
+      type: string
+      enum: [ACTIVE, PAUSED, REVOKED]
+
+    Agent:
+      type: object
+      required: [id, name, status, created_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+          maxLength: 80
+        description:
+          type: [string, "null"]
+          maxLength: 280
+        status:
+          $ref: "#/components/schemas/AgentStatus"
+        active_slip_id:
+          oneOf:
+            - $ref: "#/components/schemas/Id"
+            - type: "null"
+        keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentKeySummary"
+        created_at:
+          type: string
+          format: date-time
+
+    AgentCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 280
+      additionalProperties: false
+
+    AgentUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 280
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED]
+          description: Pause or resume. Revoking uses `revokeAgent`.
+      additionalProperties: false
+
+    AgentKeySummary:
+      type: object
+      required: [key_id, created_at]
+      properties:
+        key_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: [string, "null"]
+          format: date-time
+
+    NewAgentKey:
+      type: object
+      required: [key_id, key_secret]
+      properties:
+        key_id:
+          type: string
+        key_secret:
+          type: string
+          description: Shown once. Cosign stores only a hash.
+
+    AgentWithNewKey:
+      type: object
+      required: [agent, key]
+      properties:
+        agent:
+          $ref: "#/components/schemas/Agent"
+        key:
+          $ref: "#/components/schemas/NewAgentKey"
+
+    AgentPage:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Agent"
+        next_cursor:
+          type: [string, "null"]
+
+    RevokeResult:
+      type: object
+      required: [agent, holds_released, approvals_denied]
+      properties:
+        agent:
+          $ref: "#/components/schemas/Agent"
+        holds_released:
+          type: integer
+        approvals_denied:
+          type: integer
+
+    # --------------------------------------------------------------- slips
+    SlipRules:
+      type: object
+      description: The strict rules the rules engine enforces. Plain code, no AI.
+      required: [currency, period_days, period_budget_cents, per_purchase_max_cents, approve_above_cents, store_ids, categories]
+      properties:
+        currency:
+          $ref: "#/components/schemas/Currency"
+        period_days:
+          $ref: "#/components/schemas/PeriodDays"
+        period_budget_cents:
+          type: integer
+          format: int64
+          minimum: 100
+          maximum: 1000000
+          description: Total the agent may spend per period, across all stores. The rules engine enforces it even if store holds would allow more.
+        per_purchase_max_cents:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Hard cap per purchase; above this is DENY.
+        approve_above_cents:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Purchases above this (and within the max) need the owner's approval. 0 = approve everything.
+        store_ids:
+          type: array
+          minItems: 1
+          maxItems: 10
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Id"
+        categories:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Category"
+        expires_at:
+          type: [string, "null"]
+          format: date-time
+          description: Optional final end date. Null means periods renew (with the owner's approval) until the slip is ended.
+      additionalProperties: false
+
+    SlipDraftRequest:
+      type: object
+      required: [agent_id, text]
+      properties:
+        agent_id:
+          $ref: "#/components/schemas/Id"
+        text:
+          type: string
+          minLength: 5
+          maxLength: 1000
+          examples:
+            - "keep us stocked with paper and coffee, max $200 a month, ask me before anything over $50"
+      additionalProperties: false
+
+    SlipDraft:
+      type: object
+      required: [proposed_rules, questions, source_text]
+      properties:
+        proposed_rules:
+          description: Rules as far as the model could infer them; unknown values are null.
+          type: object
+          properties:
+            period_days:
+              type: [integer, "null"]
+              minimum: 1
+              maximum: 28
+            period_budget_cents:
+              type: [integer, "null"]
+            per_purchase_max_cents:
+              type: [integer, "null"]
+            approve_above_cents:
+              type: [integer, "null"]
+            store_ids:
+              type: array
+              items:
+                $ref: "#/components/schemas/Id"
+            categories:
+              type: array
+              items:
+                $ref: "#/components/schemas/Category"
+            expires_at:
+              type: [string, "null"]
+              format: date-time
+        questions:
+          type: array
+          description: What the owner must decide before confirming.
+          items:
+            type: string
+        source_text:
+          type: string
+
+    SlipCreate:
+      type: object
+      required: [rules, source_text]
+      properties:
+        rules:
+          $ref: "#/components/schemas/SlipRules"
+        hold_allocations:
+          type: array
+          description: |
+            Each store's share of the period budget, i.e. its hold amount. Omit for
+            an even split. When given, it must list every store in
+            `rules.store_ids` exactly once, and the shares must add up to no more
+            than `rules.period_budget_cents`.
+          minItems: 1
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/HoldAllocation"
+        source_text:
+          type: string
+          maxLength: 1000
+          description: The owner's original words, kept for the intent check and the log.
+      additionalProperties: false
+
+    HoldAllocation:
+      type: object
+      required: [store_id, amount_cents]
+      properties:
+        store_id:
+          $ref: "#/components/schemas/Id"
+        amount_cents:
+          type: integer
+          format: int64
+          minimum: 100
+      additionalProperties: false
+
+    SlipStatus:
+      type: string
+      enum: [AWAITING_HOLDS, ACTIVE, ENDED, EXPIRED]
+
+    Slip:
+      type: object
+      required: [id, agent_id, status, rules, source_text, holds, spent_this_period, current_period_ends_at, created_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        agent_id:
+          $ref: "#/components/schemas/Id"
+        status:
+          $ref: "#/components/schemas/SlipStatus"
+        rules:
+          $ref: "#/components/schemas/SlipRules"
+        rule_version:
+          type: integer
+        source_text:
+          type: string
+        holds:
+          type: array
+          items:
+            $ref: "#/components/schemas/Hold"
+        spent_this_period:
+          $ref: "#/components/schemas/Money"
+        current_period_ends_at:
+          type: string
+          format: date-time
+          description: The dashboard shows the renewal prompt before this time.
+        renewal_due:
+          type: boolean
+          description: True when the period ends within 3 days and no renewal is pending.
+        created_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: [string, "null"]
+          format: date-time
+
+    # --------------------------------------------------------------- holds
+    HoldStatus:
+      type: string
+      description: |
+        `AWAITING_APPROVAL` - owner has not approved in PayPal yet.
+        `ACTIVE` - authorization placed; captures allowed.
+        `RELEASED` - voided (slip ended, agent revoked, or replaced).
+        `EXPIRED` - PayPal authorization expired.
+        `FAILED` - PayPal refused the hold.
+      enum: [AWAITING_APPROVAL, ACTIVE, RELEASED, EXPIRED, FAILED]
+
+    Hold:
+      type: object
+      required: [id, slip_id, store, status, amount, captured, remaining]
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        slip_id:
+          $ref: "#/components/schemas/Id"
+        store:
+          $ref: "#/components/schemas/Store"
+        status:
+          $ref: "#/components/schemas/HoldStatus"
+        amount:
+          $ref: "#/components/schemas/Money"
+        captured:
+          $ref: "#/components/schemas/Money"
+        remaining:
+          $ref: "#/components/schemas/Money"
+        approval_url:
+          type: [string, "null"]
+          format: uri
+          description: PayPal page where the owner approves the hold. Only while AWAITING_APPROVAL.
+        expires_at:
+          type: [string, "null"]
+          format: date-time
+
+    # -------------------------------------------------------------- stores
+    Store:
+      type: object
+      required: [id, name, categories]
+      description: A store onboarded through PayPal Partner Referrals. PayPal IDs are not exposed.
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+        website:
+          type: [string, "null"]
+          format: uri
+
+    # ------------------------------------------------------ agent allowance
+    AgentAllowance:
+      type: object
+      required: [agent_id, status, slip]
+      properties:
+        agent_id:
+          $ref: "#/components/schemas/Id"
+        status:
+          $ref: "#/components/schemas/AgentStatus"
+        slip:
+          description: Null when the agent has no active slip.
+          oneOf:
+            - type: object
+              required: [slip_id, period_days, period_ends_at, remaining_this_period, per_purchase_max, approve_above, categories, expires_at, stores]
+              properties:
+                slip_id:
+                  $ref: "#/components/schemas/Id"
+                period_days:
+                  $ref: "#/components/schemas/PeriodDays"
+                period_ends_at:
+                  type: string
+                  format: date-time
+                remaining_this_period:
+                  $ref: "#/components/schemas/Money"
+                per_purchase_max:
+                  $ref: "#/components/schemas/Money"
+                approve_above:
+                  $ref: "#/components/schemas/Money"
+                categories:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Category"
+                expires_at:
+                  type: [string, "null"]
+                  format: date-time
+                stores:
+                  type: array
+                  description: Only stores with an ACTIVE hold.
+                  items:
+                    type: object
+                    required: [store, remaining_in_hold]
+                    properties:
+                      store:
+                        $ref: "#/components/schemas/Store"
+                      remaining_in_hold:
+                        $ref: "#/components/schemas/Money"
+            - type: "null"
+
+    # ------------------------------------------------------- spend requests
+    LineItem:
+      type: object
+      required: [name, category, quantity, unit_amount_cents]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        category:
+          $ref: "#/components/schemas/Category"
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        unit_amount_cents:
+          type: integer
+          format: int64
+          minimum: 1
+        product_url:
+          type: string
+          format: uri
+          maxLength: 2048
+      additionalProperties: false
+
+    SpendRequestCreate:
+      type: object
+      required: [store_id, items, total, purpose]
+      properties:
+        store_id:
+          $ref: "#/components/schemas/Id"
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/LineItem"
+        total:
+          $ref: "#/components/schemas/Money"
+        purpose:
+          type: string
+          minLength: 3
+          maxLength: 500
+          description: The agent's own one-line reason. Read by the intent check, never trusted as an instruction.
+      additionalProperties: false
+
+    DecisionOutcome:
+      type: string
+      enum: [ALLOW, NEEDS_APPROVAL, DENY]
+
+    ReasonCode:
+      type: string
+      enum:
+        - AGENT_PAUSED
+        - AGENT_REVOKED
+        - NO_ACTIVE_SLIP
+        - SLIP_EXPIRED
+        - STORE_NOT_ALLOWED
+        - NO_ACTIVE_HOLD
+        - HOLD_INSUFFICIENT
+        - CATEGORY_NOT_ALLOWED
+        - OVER_PER_PURCHASE_MAX
+        - OVER_PERIOD_BUDGET
+        - CURRENCY_MISMATCH
+        - TOTAL_MISMATCH
+        - ABOVE_APPROVAL_THRESHOLD
+        - INTENT_FLAGGED
+
+    Decision:
+      type: object
+      required: [outcome, reasons, rule_version, intent_check]
+      properties:
+        outcome:
+          $ref: "#/components/schemas/DecisionOutcome"
+        reasons:
+          type: array
+          items:
+            type: object
+            required: [code, message]
+            properties:
+              code:
+                $ref: "#/components/schemas/ReasonCode"
+              message:
+                type: string
+        rule_version:
+          type: integer
+        intent_check:
+          type: object
+          required: [verdict, escalated]
+          description: The AI check. It can only escalate (ALLOW to NEEDS_APPROVAL), never loosen.
+          properties:
+            verdict:
+              type: string
+              enum: [CLEAR, FLAGGED, SKIPPED]
+            escalated:
+              type: boolean
+            summary:
+              type: [string, "null"]
+              maxLength: 280
+
+    SpendRequestStatus:
+      type: string
+      enum: [COMPLETED, PENDING_APPROVAL, DENIED, APPROVAL_EXPIRED, PAYMENT_FAILED]
+
+    SpendRequest:
+      type: object
+      required: [id, agent_id, store_id, items, total, purpose, status, decision, cart_hash, created_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        agent_id:
+          $ref: "#/components/schemas/Id"
+        store_id:
+          $ref: "#/components/schemas/Id"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LineItem"
+        total:
+          $ref: "#/components/schemas/Money"
+        purpose:
+          type: string
+        status:
+          $ref: "#/components/schemas/SpendRequestStatus"
+        decision:
+          $ref: "#/components/schemas/Decision"
+        cart_hash:
+          type: string
+          description: SHA-256 of the canonical cart (store, items, total). Approvals bind to it.
+        approval_expires_at:
+          type: [string, "null"]
+          format: date-time
+        receipt:
+          description: Present when COMPLETED.
+          oneOf:
+            - type: object
+              required: [receipt_id, paid, paid_at]
+              properties:
+                receipt_id:
+                  type: string
+                paid:
+                  $ref: "#/components/schemas/Money"
+                paid_at:
+                  type: string
+                  format: date-time
+            - type: "null"
+        created_at:
+          type: string
+          format: date-time
+
+    SpendRequestPage:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpendRequest"
+        next_cursor:
+          type: [string, "null"]
+
+    # ------------------------------------------------------------ approvals
+    ApprovalStatus:
+      type: string
+      enum: [PENDING, APPROVED, DENIED, EXPIRED]
+
+    Approval:
+      type: object
+      required: [id, status, spend_request, created_at, expires_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        status:
+          $ref: "#/components/schemas/ApprovalStatus"
+        spend_request:
+          $ref: "#/components/schemas/SpendRequest"
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        decided_at:
+          type: [string, "null"]
+          format: date-time
+
+    ApprovalDecision:
+      type: object
+      required: [cart_hash, total]
+      properties:
+        cart_hash:
+          type: string
+          description: Must equal the spend request's current cart_hash.
+        total:
+          $ref: "#/components/schemas/Money"
+      additionalProperties: false
+
+    ApprovalPage:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Approval"
+        next_cursor:
+          type: [string, "null"]
+
+    # ------------------------------------------------------------- activity
+    ActivityType:
+      type: string
+      enum:
+        - SPEND_REQUESTED
+        - SPEND_ALLOWED
+        - SPEND_DENIED
+        - APPROVAL_REQUESTED
+        - APPROVAL_GRANTED
+        - APPROVAL_DENIED
+        - PAYMENT_CAPTURED
+        - PAYMENT_FAILED
+        - REFUND_ISSUED
+        - HOLD_APPROVED
+        - HOLD_RELEASED
+        - HOLD_EXPIRED
+        - SLIP_CREATED
+        - SLIP_RENEWAL_DUE
+        - SLIP_RENEWED
+        - SLIP_ENDED
+        - AGENT_CREATED
+        - AGENT_PAUSED
+        - AGENT_RESUMED
+        - AGENT_REVOKED
+        - KEY_CREATED
+        - KEY_REVOKED
+
+    ActivityEvent:
+      type: object
+      required: [id, type, occurred_at, summary]
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        type:
+          $ref: "#/components/schemas/ActivityType"
+        occurred_at:
+          type: string
+          format: date-time
+        agent_id:
+          oneOf:
+            - $ref: "#/components/schemas/Id"
+            - type: "null"
+        spend_request_id:
+          oneOf:
+            - $ref: "#/components/schemas/Id"
+            - type: "null"
+        amount:
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
+        summary:
+          type: string
+
+    ActivityPage:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityEvent"
+        next_cursor:
+          type: [string, "null"]

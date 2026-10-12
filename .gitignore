@@ -1,0 +1,34 @@
+# Secrets - never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.claude/settings.local.json
+
+# Dependencies and builds
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# OS
+.DS_Store
+
+# Week 1 sandbox test state (sandbox ids, keep local)
+scripts/.week1-state.json
+
+# Private team notes and local Claude settings - never in the public repo
+CLAUDE.md
+.claude/
+
+# Next.js / TypeScript build output
+next-env.d.ts
+*.tsbuildinfo
+
+# Demo bot: saved Channel3 results for reliable recordings
+scripts/demo/.channel3-cache.json
+
+# Sponsor reference PDF (third-party, not ours to publish)
+APIMatic Context Plugins for PayPal - Getting Started.pdf

@@ -1,0 +1,52 @@
+{
+  "name": "cosign",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Spending controls for AI agents, paid through PayPal.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "db:generate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs generate",
+    "db:migrate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs migrate",
+    "db:verify": "psql -X -q -v ON_ERROR_STOP=1 -d cosign_dev -f scripts/db/verify-constraints.sql",
+    "db:seed": "psql -X -q -v ON_ERROR_STOP=1 -d cosign_dev -f scripts/db/seed-stores.sql",
+    "demo:bot": "node --env-file=.env.local scripts/demo/procurement-bot.mjs",
+    "test:db": "node --env-file=.env.local scripts/test/with-test-db.mjs node_modules/.bin/tsx --conditions=react-server --test \"src/**/*.itest.ts\"",
+    "demo:seed": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs --conditions=react-server scripts/demo/seed-demo-account.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.132.1",
+    "@auth/drizzle-adapter": "^1.11.3",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@paypal/paypal-server-sdk": "2.5.0",
+    "ag-charts-community": "14.2.0",
+    "ag-charts-react": "14.2.0",
+    "ag-grid-community": "36.2.0",
+    "ag-grid-react": "36.2.0",
+    "drizzle-orm": "^0.45.4",
+    "next": "^16.4.0",
+    "next-auth": "5.0.0-beta.32",
+    "pg": "^8.23.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "drizzle-kit": "^0.31.11",
+    "server-only": "0.0.1",
+    "tsx": "4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

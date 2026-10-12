@@ -1,0 +1,53 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { THEME_KEY } from "@/lib/theme";
+
+type Theme = "light" | "dark";
+
+function currentTheme(): Theme {
+  const set = document.documentElement.dataset.theme;
+  if (set === "light" || set === "dark") return set;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+// Switches between light and dark. Until the person picks, the system setting wins.
+export function ThemeToggle() {
+  const [theme, setTheme] = useState<Theme | null>(null);
+
+  useEffect(() => {
+    setTheme(currentTheme());
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => setTheme(currentTheme());
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  const next: Theme = theme === "dark" ? "light" : "dark";
+
+  function toggle() {
+    document.documentElement.dataset.theme = next;
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      // Storage blocked (private mode): the switch still works for this page.
+    }
+    setTheme(next);
+  }
+
+  return (
+    <button type="button" className="icon-button" onClick={toggle} aria-label={`Switch to ${next} mode`} title={`Switch to ${next} mode`}>
+      {theme === "dark" ? (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2" />
+          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M20 14.6A8 8 0 0 1 9.4 4a8 8 0 1 0 10.6 10.6Z" />
+        </svg>
+      )}
+    </button>
+  );
+}
+

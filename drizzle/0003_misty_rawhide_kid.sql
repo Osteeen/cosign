@@ -1,0 +1,1 @@
+ALTER TABLE "spend_requests" ADD COLUMN "market_check" jsonb;
