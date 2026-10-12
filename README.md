@@ -61,7 +61,7 @@ Identity comes only from the session or the agent's credential; every read and w
 
 ## Contact
 
-Built by Osteen - austinjohn337@gmail.com. Questions, feedback and ideas welcome.
+Built by Osteen. I'd love to hear your questions, feedback and ideas: austinjohn337@gmail.com
 
 ## Licence
 
