@@ -10,6 +10,7 @@ import { sendEmail } from "@/lib/email/send";
 import { formatUsd } from "@/lib/money";
 import { appUrl, logActivity } from "./common";
 import { marketSummary, runMarketCheck } from "./market";
+import { isDemoOwner } from "@/lib/demo/account";
 
 export async function notifyApprovalNeeded(spendRequestId: string): Promise<void> {
   try {
@@ -25,6 +26,8 @@ export async function notifyApprovalNeeded(spendRequestId: string): Promise<void
 
     // Market prices first (bounded by Channel3's and Claude's own timeouts), so the email can show them.
     const market = marketSummary(await runMarketCheck(spendRequestId));
+    // The shared demo account has a fake address: show everything in the app, send no email.
+    if (isDemoOwner(row.approval.ownerId)) return;
     const { subject, html, text } = approvalEmail({
       market,
       agentName: row.agentName,

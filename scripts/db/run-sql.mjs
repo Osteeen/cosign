@@ -1,5 +1,5 @@
 // Runs a .sql file against DATABASE_URL with the pg driver (no psql needed,
-// e.g. on Render). Never prints the URL.
+// e.g. in a Railway deploy). Never prints the URL.
 //   node scripts/db/run-sql.mjs scripts/db/seed-stores.sql
 import { readFileSync } from "node:fs";
 import pg from "pg";

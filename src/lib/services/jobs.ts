@@ -11,6 +11,7 @@ import { sendEmail } from "@/lib/email/send";
 import { addDays, appUrl, logActivity } from "./common";
 import { renewalState, RENEWAL_WINDOW_DAYS, rollOverIfDue } from "./slips";
 import { reauthorizeDueHolds } from "./reauth";
+import { isDemoOwner } from "@/lib/demo/account";
 import { expireApprovals } from "./spend";
 
 export async function runDailyJob(now = new Date()) {
@@ -35,6 +36,7 @@ export async function runDailyJob(now = new Date()) {
     .where(and(eq(slips.status, "ACTIVE"), eq(agents.status, "ACTIVE"), lte(slips.currentPeriodEndsAt, addDays(now, RENEWAL_WINDOW_DAYS))));
   for (const { slip, agentName, email } of dueSoon) {
     if (renewalState(slip, now).lastPeriod) continue;
+    if (isDemoOwner(slip.ownerId)) continue; // demo account: no email
     const started = await db
       .select({ id: holds.id })
       .from(holds)

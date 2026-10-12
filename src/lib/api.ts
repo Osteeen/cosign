@@ -26,7 +26,7 @@ export function fromError(e: unknown): Response {
 export const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
-// Fixed-window limiter, per process. Enough for one Render instance; a shared
+// Fixed-window limiter, per process. Enough for one app instance; a shared
 // store would be needed for several.
 const windows = new Map<string, { start: number; count: number }>();
 export function rateLimit(key: string, limit: number, windowMs: number): { ok: true } | { ok: false; retryAfter: number } {
