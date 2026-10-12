@@ -1,6 +1,6 @@
 // The demo procurement bot, run on Cosign's server for the demo account so a
 // judge can watch the whole story with one click. Same behaviour as the
-// terminal bot (scripts/demo/procurement-bot.mjs): it plans with Claude, reads
+// terminal bot (scripts/demo/procurement-bot.ts): it plans with Claude, reads
 // the stores' real product pages, and - TRUSTING on purpose - obeys a note on a
 // page telling it how many to buy. It asks Cosign to pay through the same
 // spending service the agent API uses, so the rules engine, the AI purchase

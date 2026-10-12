@@ -18,4 +18,9 @@ for lang in typescript python csharp; do
   mkdir -p "$ROOT/sdks/$lang"
   unzip -q "$HERE/build/portal/__downloads/sdk/$lang.zip" -d "$ROOT/sdks/$lang"
 done
-echo "Regenerated docs-portal/, sdks/ and build/plugin from api/openapi.yaml"
+# The Context Plugin's own repo (Osteeen/cosign-context-plugin) lives in plugin-repo/;
+# sync it, then commit and push there by hand after reviewing.
+if [ -d "$HERE/plugin-repo/.git" ]; then
+  rsync -a --delete --exclude .git "$HERE/build/plugin/" "$HERE/plugin-repo/"
+fi
+echo "Regenerated docs-portal/, sdks/ and the Context Plugin from api/openapi.yaml"

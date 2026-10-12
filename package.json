@@ -18,7 +18,7 @@
     "db:migrate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs migrate",
     "db:verify": "psql -X -q -v ON_ERROR_STOP=1 -d cosign_dev -f scripts/db/verify-constraints.sql",
     "db:seed": "psql -X -q -v ON_ERROR_STOP=1 -d cosign_dev -f scripts/db/seed-stores.sql",
-    "demo:bot": "node --env-file=.env.local scripts/demo/procurement-bot.mjs",
+    "demo:bot": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs scripts/demo/procurement-bot.ts",
     "test:db": "node --env-file=.env.local scripts/test/with-test-db.mjs node_modules/.bin/tsx --conditions=react-server --test \"src/**/*.itest.ts\"",
     "demo:seed": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs --conditions=react-server scripts/demo/seed-demo-account.ts",
     "db:migrate:deploy": "node node_modules/drizzle-kit/bin.cjs migrate",
