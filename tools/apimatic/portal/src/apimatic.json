@@ -14,8 +14,8 @@
       "favicon": "static/images/favicon.ico",
       "colors": {
         "primary": {
-          "light": "#17704a",
-          "dark": "#5fcf98"
+          "light": "#2343c8",
+          "dark": "#8aa0ff"
         }
       },
       "colorMode": "both"

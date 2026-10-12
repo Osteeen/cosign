@@ -14,6 +14,7 @@ import {
   type ProcessCellForExportParams,
   type RowSelectionOptions,
 } from "ag-grid-community";
+import { MasterDetailModule, RowGroupingModule, RowGroupingPanelModule, SetFilterModule } from "ag-grid-enterprise";
 import { spendingRowsAction } from "@/app/actions";
 import { BulkDecisionBar, type BulkItem } from "./bulk-approvals";
 import { SpendingCharts } from "./spending-charts";
@@ -29,7 +30,10 @@ import type { SpendingRow } from "@/lib/services/overview";
 const POLL_MS = 5000;
 type Pinned = { pinned: true; label: string; paidCents: number; count: number };
 
-ModuleRegistry.registerModules([AllCommunityModule]);
+// Community plus a few AG Grid Enterprise modules (grouping with subtotals,
+// expandable rows, checklist filters). No licence key: the AG Grid team
+// confirmed the trial watermark is fine for the hackathon judging.
+ModuleRegistry.registerModules([AllCommunityModule, RowGroupingModule, RowGroupingPanelModule, MasterDetailModule, SetFilterModule]);
 
 // Built from Cosign's own tokens, so light and dark follow the site theme.
 const theme = themeQuartz.withParams({
@@ -59,6 +63,40 @@ const STAMP: Record<SpendingRow["outcome"], { tone: string; label: string }> = {
   "Not paid": { tone: "deny", label: "Not paid" },
 };
 const FILTERS = ["All", "Paid", "Waiting for you", "Blocked", "Declined"] as const;
+// Group-by presets (AG Grid Enterprise row grouping). Columns can also be
+// dragged into the grouping bar above the grid.
+const GROUPINGS: { label: string; cols: string[] }[] = [
+  { label: "No grouping", cols: [] },
+  { label: "By agent", cols: ["agent"] },
+  { label: "By store", cols: ["store"] },
+  { label: "Agent, then store", cols: ["agent", "store"] },
+];
+
+// The expanded view of one purchase (AG Grid Enterprise master/detail).
+function PurchaseDetail({ data }: { data: SpendingRow }) {
+  const rows: [string, string][] = [
+    ["What", data.items],
+    ["Why", data.why || "-"],
+    ["AI check", data.aiCheck],
+    ["Market (Channel3)", data.market || "Not checked - only purchases that wait for you are price-checked"],
+  ];
+  return (
+    <div className="purchase-detail">
+      <dl>
+        {rows.map(([k, v]) => (
+          <div key={k}>
+            <dt>{k}</dt>
+            <dd>{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <figure className="approval-said">
+        <figcaption className="approval-label">The agent said</figcaption>
+        <blockquote>{data.purpose}</blockquote>
+      </figure>
+    </div>
+  );
+}
 type Filter = (typeof FILTERS)[number];
 
 const when = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -83,6 +121,20 @@ export function SpendingGrid({ rows: initial }: { rows: SpendingRow[] }) {
   // The grid reads the outcome filter through a ref, so it never sees a stale value.
   const filterRef = useRef<Filter>("All");
   const [rows] = useState<SpendingRow[]>(initial);
+  const [grouping, setGrouping] = useState(0);
+  const groupBy = (i: number) => {
+    setGrouping(i);
+    const cols = GROUPINGS[i]!.cols;
+    api.current?.applyColumnState({
+      // Grouped columns hide while grouped (the group column shows their value).
+      state: ["agent", "store", "outcome", "aiCheck"].map((colId) => ({
+        colId,
+        rowGroup: cols.includes(colId),
+        rowGroupIndex: cols.includes(colId) ? cols.indexOf(colId) : null,
+        hide: cols.includes(colId),
+      })),
+    });
+  };
   // Stable agent order for chart colours: oldest activity first, new agents appended.
   const [agentOrder, setAgentOrder] = useState<string[]>(() => [...new Set([...initial].reverse().map((r) => r.agentId))]);
   const [shown, setShown] = useState<SpendingRow[]>(initial);
@@ -153,15 +205,18 @@ export function SpendingGrid({ rows: initial }: { rows: SpendingRow[] }) {
         field: "agent",
         headerName: "Agent",
         minWidth: 170,
-        filter: "agTextColumnFilter",
+        filter: "agSetColumnFilter",
+        enableRowGroup: true,
         cellRenderer: (p: ICellRendererParams<SpendingRow>) =>
-          p.data && !p.node.rowPinned ? (
+          p.node.group ? (
+            <span className="grid-group-label">{String(p.value ?? "")}</span>
+          ) : p.data && !p.node.rowPinned ? (
             <Link href={`/agents/${p.data.agentId}`} className="grid-link">
               {p.data.agent}
             </Link>
           ) : null,
       },
-      { field: "store", headerName: "Store", width: 130, filter: "agTextColumnFilter" },
+      { field: "store", headerName: "Store", width: 130, filter: "agSetColumnFilter", enableRowGroup: true },
       {
         field: "items",
         headerName: "What",
@@ -177,9 +232,24 @@ export function SpendingGrid({ rows: initial }: { rows: SpendingRow[] }) {
         width: 120,
         type: "rightAligned",
         filter: "agNumberColumnFilter",
-        valueGetter: (p) => (p.node?.rowPinned ? (p.data as unknown as Pinned).paidCents / 100 : p.data ? p.data.amountCents / 100 : null),
+        valueGetter: (p) => (p.node?.rowPinned ? null : p.data ? p.data.amountCents / 100 : null),
+        valueFormatter: (p) => (typeof p.value === "number" ? formatUsd(Math.round(p.value * 100)) : ""),
+        cellClass: "grid-mono",
+        aggFunc: "sum",
+        enableCellChangeFlash: true,
+      },
+      {
+        colId: "paid",
+        headerName: "Paid",
+        width: 110,
+        type: "rightAligned",
+        filter: false,
+        // What actually left the owner's budget; subtotals per group.
+        valueGetter: (p) =>
+          p.node?.rowPinned ? (p.data as unknown as Pinned).paidCents / 100 : p.data ? (p.data.outcome === "Paid" ? p.data.amountCents / 100 : 0) : null,
         valueFormatter: (p) => (typeof p.value === "number" ? formatUsd(Math.round(p.value * 100)) : ""),
         cellClass: (p) => (p.node.rowPinned ? "grid-mono grid-total" : "grid-mono"),
+        aggFunc: "sum",
         enableCellChangeFlash: true,
       },
       {
@@ -187,10 +257,13 @@ export function SpendingGrid({ rows: initial }: { rows: SpendingRow[] }) {
         headerName: "Outcome",
         width: 140,
         minWidth: 130,
-        filter: "agTextColumnFilter",
+        filter: "agSetColumnFilter",
+        enableRowGroup: true,
         enableCellChangeFlash: true,
         cellRenderer: (p: ICellRendererParams<SpendingRow>) =>
-          p.node.rowPinned ? (
+          p.node.group ? (
+            <span className="grid-group-label">{String(p.value ?? "")}</span>
+          ) : p.node.rowPinned ? (
             <span className="grid-total-label">paid</span>
           ) : p.data ? (
             <span className={`stamp stamp-${STAMP[p.data.outcome].tone}`} title={p.data.outcome}>
@@ -198,7 +271,7 @@ export function SpendingGrid({ rows: initial }: { rows: SpendingRow[] }) {
             </span>
           ) : null,
       },
-      { field: "aiCheck", headerName: "AI check", width: 110, filter: "agTextColumnFilter" },
+      { field: "aiCheck", headerName: "AI check", width: 110, filter: "agSetColumnFilter", enableRowGroup: true },
       { field: "market", headerName: "Market (Channel3)", width: 230, filter: "agTextColumnFilter", tooltipField: "market" },
       { field: "why", headerName: "Why", flex: 1, minWidth: 240, filter: "agTextColumnFilter", tooltipField: "why" },
       { field: "purpose", headerName: "Agent said", flex: 1, minWidth: 220, filter: "agTextColumnFilter", tooltipField: "purpose", hide: true },
@@ -264,6 +337,14 @@ export function SpendingGrid({ rows: initial }: { rows: SpendingRow[] }) {
       </dl>
 
       <SpendingCharts shown={shown} agentOrder={agentOrder} />
+
+      <div className="chip-row" role="group" aria-label="Group purchases">
+        {GROUPINGS.map((g, i) => (
+          <button key={g.label} type="button" className="chip chip-quiet" aria-pressed={grouping === i} onClick={() => groupBy(i)}>
+            {g.label}
+          </button>
+        ))}
+      </div>
 
       <div className="spend-tools">
         <div className="chip-row" role="group" aria-label="Outcome">
@@ -333,6 +414,15 @@ export function SpendingGrid({ rows: initial }: { rows: SpendingRow[] }) {
           rowSelection={rowSelection}
           onSelectionChanged={recount}
           pinnedBottomRowData={pinned}
+          rowGroupPanelShow="always"
+          // Open group headers by default, never purchase details.
+          isGroupOpenByDefault={(p) => !!p.rowNode.group}
+          autoGroupColumnDef={{ headerName: "Group", minWidth: 220, cellRendererParams: { suppressCount: false } }}
+          suppressAggFuncInHeader
+          masterDetail
+          isRowMaster={(d) => !!d && "id" in d}
+          detailCellRenderer={PurchaseDetail}
+          detailRowAutoHeight
           quickFilterText={search}
           isExternalFilterPresent={() => filterRef.current !== "All"}
           doesExternalFilterPass={(n: IRowNode<SpendingRow>) => !n.data || n.data.outcome === filterRef.current}

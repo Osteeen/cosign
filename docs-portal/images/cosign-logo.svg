@@ -4,5 +4,5 @@
     text { font-family: "CosignArchivo", "Helvetica Neue", Arial, sans-serif; font-weight: 800; font-size: 30px; font-stretch: 125%; font-variation-settings: "wdth" 125; letter-spacing: -0.6px; }
   </style>
   <text x="2" y="28" fill="#16213a">Cosign</text>
-  <path d="M3 37.5 C 37 30.5, 80 41.5, 117 34.5 S 152 33, 163 35.5" fill="none" stroke="#17704a" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M3 37.5 C 37 30.5, 80 41.5, 117 34.5 S 152 33, 163 35.5" fill="none" stroke="#2343c8" stroke-width="2.6" stroke-linecap="round"/>
 </svg>
