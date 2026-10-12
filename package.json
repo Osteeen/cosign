@@ -23,7 +23,7 @@
     "demo:seed": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs --conditions=react-server scripts/demo/seed-demo-account.ts",
     "db:migrate:deploy": "node scripts/db/migrate.mjs",
     "db:seed:deploy": "node scripts/db/run-sql.mjs scripts/db/seed-stores.sql",
-    "demo:seed:deploy": "node node_modules/tsx/dist/cli.mjs --conditions=react-server scripts/demo/seed-demo-account.ts"
+    "demo:seed:deploy": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs --conditions=react-server scripts/demo/seed-demo-account.ts --deploy"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",

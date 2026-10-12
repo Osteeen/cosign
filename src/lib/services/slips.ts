@@ -5,7 +5,7 @@
 // placed. End: the slip stops and every hold is released.
 
 import "server-only";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { agents, holds, slips, slipStores, stores } from "@/db/schema";
@@ -175,6 +175,24 @@ async function openHoldsAtPayPal(ownerId: string, agentId: string, newHolds: (ty
       });
     }
   }
+}
+
+// Opens again the holds of a slip that never reached PayPal (FAILED with no
+// PayPal order), while the slip still waits for its holds. Holds that reached
+// PayPal are never touched. Returns how many were retried.
+export async function reopenFailedHolds(ownerId: string, slipId: string): Promise<number> {
+  const [slip] = await db
+    .select({ agentId: slips.agentId })
+    .from(slips)
+    .where(and(eq(slips.id, slipId), eq(slips.ownerId, ownerId), eq(slips.status, "AWAITING_HOLDS")));
+  if (!slip) throw notFound("Permission slip");
+  const retry = await db
+    .update(holds)
+    .set({ status: "AWAITING_APPROVAL" })
+    .where(and(eq(holds.slipId, slipId), eq(holds.ownerId, ownerId), eq(holds.status, "FAILED"), isNull(holds.paypalOrderId)))
+    .returning();
+  await openHoldsAtPayPal(ownerId, slip.agentId, retry);
+  return retry.length;
 }
 
 // The owner is back from PayPal. Only the signed-in owner's own hold can be
