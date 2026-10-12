@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { Archivo, IBM_Plex_Mono, Mrs_Saint_Delafield } from "next/font/google";
+import { NavProgress } from "@/components/nav-progress";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -23,6 +24,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
+        <Suspense fallback={null}>
+          <NavProgress />
+        </Suspense>
         <div className="sandbox-strip">Sandbox - no real money moves</div>
         {children}
       </body>

@@ -2712,3 +2712,26 @@ button.chip {
 .grid-group-label {
   font-weight: 700;
 }
+
+/* Page-loading line (NavProgress): Cosign's ink, across the very top. */
+.nav-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 1000;
+  pointer-events: none;
+  background: var(--ballpoint);
+  box-shadow: 0 0 8px var(--ballpoint);
+  transform: scaleX(0);
+  transform-origin: left center;
+  opacity: 0;
+  transition: transform 250ms var(--ease-out), opacity 300ms ease 150ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress {
+    transition: opacity 200ms ease;
+  }
+}
