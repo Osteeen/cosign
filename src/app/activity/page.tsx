@@ -20,6 +20,9 @@ const STAMP: Record<string, { cls: string; label: string }> = {
   PAYMENT_UNCONFIRMED: { cls: "ask", label: "Checking" },
   HOLD_FAILED: { cls: "deny", label: "Failed" },
   HOLD_RELEASE_FAILED: { cls: "ask", label: "Check" },
+  PAYMENT_REVERSED: { cls: "deny", label: "Reversed" },
+  PAYMENT_NEEDS_REVIEW: { cls: "ask", label: "Check" },
+  PAYMENT_REFUNDED: { cls: "ask", label: "Refunded" },
 };
 
 type Search = { agent?: string; type?: string; before?: string; after?: string };

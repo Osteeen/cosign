@@ -38,6 +38,8 @@ services:
         sync: false
       - key: PAYPAL_PARTNER_MERCHANT_ID
         sync: false
+      - key: PAYPAL_WEBHOOK_ID # from the PayPal app after registering /api/paypal/webhook
+        sync: false
       - key: AUTH_RESEND_KEY
         sync: false
       - key: AUTH_EMAIL_FROM

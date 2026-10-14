@@ -49,7 +49,7 @@ export async function recentActivity(ownerId: string, agentId?: string, limit = 
 
 // Groups people filter by; each maps to the event types it covers.
 export const ACTIVITY_GROUPS = {
-  paid: { label: "Paid", types: ["PAYMENT_CAPTURED", "SPEND_ALLOWED"] },
+  paid: { label: "Paid", types: ["PAYMENT_CAPTURED", "SPEND_ALLOWED", "PAYMENT_REFUNDED"] },
   blocked: { label: "Blocked", types: ["SPEND_DENIED"] },
   approvals: { label: "Approvals", types: ["APPROVAL_REQUESTED", "APPROVAL_GRANTED", "APPROVAL_DENIED"] },
   holds: { label: "Budget holds", types: ["HOLD_APPROVED", "HOLD_REAUTHORIZED", "HOLD_RELEASED", "HOLD_EXPIRED"] },
@@ -57,7 +57,7 @@ export const ACTIVITY_GROUPS = {
     label: "Agents and slips",
     types: ["AGENT_CREATED", "AGENT_PAUSED", "AGENT_RESUMED", "AGENT_REVOKED", "SLIP_CREATED", "SLIP_ENDED", "SLIP_RENEWED", "SLIP_RENEWAL_STARTED", "SLIP_RENEWAL_DUE", "SLIP_EXPIRED", "APPROVAL_EMAILED"],
   },
-  problems: { label: "Problems", types: ["PAYMENT_FAILED", "PAYMENT_UNCONFIRMED", "HOLD_FAILED", "HOLD_RELEASE_FAILED", "EMAIL_FAILED"] },
+  problems: { label: "Problems", types: ["PAYMENT_FAILED", "PAYMENT_UNCONFIRMED", "PAYMENT_REVERSED", "PAYMENT_NEEDS_REVIEW", "HOLD_FAILED", "HOLD_RELEASE_FAILED", "EMAIL_FAILED"] },
 } as const;
 export type ActivityGroup = keyof typeof ACTIVITY_GROUPS;
 

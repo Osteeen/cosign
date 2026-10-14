@@ -272,9 +272,10 @@ components:
       example: COMPLETED
       description: >
         - `PROCESSING` - allowed; the PayPal capture is not confirmed yet. Poll.
-
-        - `COMPLETED` - paid.
-
+          PayPal's own notification (webhook) settles it if the first answer was lost.
+        - `COMPLETED` - paid. In rare cases PayPal accepts a capture as pending
+        and
+          denies it later; the request then becomes `PAYMENT_FAILED`.
         - `PENDING_APPROVAL` - waiting for the owner.
 
         - `DENIED` - blocked by the rules, or declined by the owner.

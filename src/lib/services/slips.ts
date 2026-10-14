@@ -9,7 +9,7 @@ import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { agents, holds, slips, slipStores, stores } from "@/db/schema";
-import { authorizeOrder, createHoldOrder, getOrder } from "@/lib/paypal/holds";
+import { authorizeOrder, createHoldOrder, getOrder, voidHold } from "@/lib/paypal/holds";
 import { PayPalError } from "@/lib/paypal/client";
 import type { Category } from "@/lib/rules/types";
 import { addDays, appUrl, logActivity, notFound, ServiceError } from "./common";
@@ -224,7 +224,7 @@ export async function completeHoldApproval(ownerId: string, orderId: string): Pr
   }
 
   const now = new Date();
-  await db.transaction(async (tx) => {
+  const placedHere = await db.transaction(async (tx) => {
     const [updated] = await tx
       .update(holds)
       .set({
@@ -236,7 +236,7 @@ export async function completeHoldApproval(ownerId: string, orderId: string): Pr
       })
       .where(and(eq(holds.id, hold.hold.id), eq(holds.ownerId, ownerId), eq(holds.status, "AWAITING_APPROVAL")))
       .returning({ slipId: holds.slipId });
-    if (!updated) return; // A concurrent return already placed it.
+    if (!updated) return false;
     await tx
       .update(slips)
       .set({ status: "ACTIVE" })
@@ -249,7 +249,34 @@ export async function completeHoldApproval(ownerId: string, orderId: string): Pr
       amountCents: hold.hold.amountCents,
       data: { holdId: hold.hold.id },
     });
+    return true;
   });
+
+  if (!placedHere) {
+    // Either a concurrent return placed this same authorization (fine), or the
+    // hold was closed (revoke, end, roll-over) while PayPal was authorizing.
+    // Then nothing in Cosign points at the new authorization: void it now, or
+    // the owner's money would stay held at PayPal with no record here.
+    const [now2] = await db.select({ authorizationId: holds.paypalAuthorizationId }).from(holds).where(eq(holds.id, hold.hold.id));
+    if (now2?.authorizationId === placed.authorizationId) return { agentId: hold.agentId };
+    let voided = true;
+    try {
+      await voidHold({ authorizationId: placed.authorizationId, storeMerchantId: hold.merchantId });
+    } catch (e) {
+      voided = e instanceof PayPalError && e.status === 422; // already voided or captured
+    }
+    await logActivity(db, {
+      ownerId,
+      agentId: hold.agentId,
+      type: voided ? "HOLD_RELEASED" : "HOLD_RELEASE_FAILED",
+      summary: voided
+        ? "Released a budget hold approved after its permission slip had closed"
+        : "A budget hold approved after its permission slip closed could not be released; it will expire on its own",
+      amountCents: hold.hold.amountCents,
+      data: { holdId: hold.hold.id, late: true },
+    });
+    throw new ServiceError(409, "hold_closed", "This budget hold was closed before it was approved. Nothing was held.");
+  }
   return { agentId: hold.agentId };
 }
 

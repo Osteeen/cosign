@@ -5,14 +5,14 @@ using CosignAgentApi.Core.Enum;
 namespace CosignAgentApi.Models.Enums;
 
 /// <summary>
-/// <list type="bullet">
-///   <item><description><c>PROCESSING</c> - allowed; the PayPal capture is not confirmed yet. Poll.</description></item>
-///   <item><description><c>COMPLETED</c> - paid.</description></item>
-///   <item><description><c>PENDING_APPROVAL</c> - waiting for the owner.</description></item>
-///   <item><description><c>DENIED</c> - blocked by the rules, or declined by the owner.</description></item>
-///   <item><description><c>APPROVAL_EXPIRED</c> - the owner did not decide in time. Nothing was charged.</description></item>
-///   <item><description><c>PAYMENT_FAILED</c> - PayPal refused the capture. Nothing was charged.</description></item>
-/// </list>
+/// - <c>PROCESSING</c> - allowed; the PayPal capture is not confirmed yet. Poll.
+///   PayPal's own notification (webhook) settles it if the first answer was lost.
+/// - <c>COMPLETED</c> - paid. In rare cases PayPal accepts a capture as pending and
+///   denies it later; the request then becomes <c>PAYMENT_FAILED</c>.
+/// - <c>PENDING_APPROVAL</c> - waiting for the owner.
+/// - <c>DENIED</c> - blocked by the rules, or declined by the owner.
+/// - <c>APPROVAL_EXPIRED</c> - the owner did not decide in time. Nothing was charged.
+/// - <c>PAYMENT_FAILED</c> - PayPal refused the capture. Nothing was charged.
 /// </summary>
 [JsonConverter(typeof(StringEnumConverter<SpendRequestStatus>))]
 public sealed record SpendRequestStatus : OpenStringEnum<SpendRequestStatus>

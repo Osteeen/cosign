@@ -352,6 +352,107 @@ async function settle(row: SpendRow, captureId: string | null, failure: string |
   });
 }
 
+// ------------------------------------------------- PayPal webhook follow-up
+// Verified PayPal events about captures. Each one names our spend request in
+// invoice_id (set on every capture). All are safe to repeat.
+
+export type WebhookOutcome = string;
+
+const isUuid = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v);
+
+// PayPal says money moved in a way Cosign did not count. Money states are
+// never changed automatically here; the owner sees it under Problems.
+async function needsReview(row: SpendRow, summary: string, data: Record<string, unknown>) {
+  await logActivity(db, {
+    ownerId: row.ownerId,
+    agentId: row.agentId,
+    spendRequestId: row.id,
+    type: "PAYMENT_NEEDS_REVIEW",
+    amountCents: row.totalCents,
+    summary,
+    data,
+  });
+}
+
+// PAYMENT.CAPTURE.COMPLETED: settles a request still waiting for PayPal's
+// answer (timeout, server stopped) - the money moved, so it is paid. The
+// capture must be for this request's amount, from the authorization it was
+// sent to; anything else is flagged for the owner, never settled.
+export async function captureConfirmedByPayPal(spendId: unknown, captureId: string, amountCents: number | null, authorizationId: string | null): Promise<WebhookOutcome> {
+  if (!isUuid(spendId)) return "not_ours";
+  const [row] = await db.select().from(spendRequests).where(eq(spendRequests.id, spendId));
+  if (!row) return "not_ours";
+  if (authorizationId && row.captureAuthorizationId && authorizationId !== row.captureAuthorizationId) {
+    const [hold] = await db.select({ a: holds.paypalAuthorizationId, c: holds.paypalCurrentAuthorizationId }).from(holds).where(eq(holds.id, row.holdId!));
+    // Not from this hold at all: someone else's capture that reused the ID.
+    if (authorizationId !== hold?.a && authorizationId !== hold?.c) return "not_ours";
+  }
+  if (row.status === "COMPLETED") {
+    if (row.paypalCaptureId === captureId) return "already_paid";
+    await needsReview(row, `PayPal reports a second payment for this purchase (${amountCents === null ? "amount unknown" : formatUsd(amountCents)}); check it with the store`, { captureId });
+    return "flagged_second_capture";
+  }
+  if (row.status !== "PROCESSING") {
+    // Cosign counted it as not paid (or never sent it), but PayPal took the money.
+    await needsReview(row, `PayPal reports a payment of ${amountCents === null ? "an unknown amount" : formatUsd(amountCents)} that Cosign recorded as not paid; check it with the store`, { captureId, status: row.status });
+    return `flagged_${row.status.toLowerCase()}`;
+  }
+  if (amountCents !== row.totalCents) {
+    await needsReview(row, `PayPal reports ${amountCents === null ? "an unknown amount" : formatUsd(amountCents)} for a ${formatUsd(row.totalCents)} purchase; it was not marked paid`, { captureId });
+    return "flagged_amount_mismatch";
+  }
+  await settle(row, captureId, null);
+  return "settled_paid";
+}
+
+// PAYMENT.CAPTURE.DENIED / DECLINED: the money did not move. A waiting request
+// fails; one we already counted as paid (PayPal said PENDING) is reversed and
+// its amount goes back to the hold.
+export async function captureFailedAtPayPal(spendId: unknown, captureId: string): Promise<WebhookOutcome> {
+  if (!isUuid(spendId)) return "not_ours";
+  const [row] = await db.select().from(spendRequests).where(eq(spendRequests.id, spendId));
+  if (!row) return "not_ours";
+  if (row.status === "PROCESSING") {
+    await settle(row, null, "capture_denied");
+    return "settled_failed";
+  }
+  if (row.status !== "COMPLETED" || row.paypalCaptureId !== captureId) return `ignored_${row.status.toLowerCase()}`;
+  return db.transaction(async (tx) => {
+    const [current] = await tx.select().from(spendRequests).where(eq(spendRequests.id, row.id)).for("update");
+    if (current?.status !== "COMPLETED") return "already_reversed";
+    await tx.update(holds).set({ capturedCents: sql`${holds.capturedCents} - ${row.totalCents}` }).where(eq(holds.id, row.holdId!));
+    await tx.update(spendRequests).set({ status: "PAYMENT_FAILED" }).where(eq(spendRequests.id, row.id));
+    await logActivity(tx, {
+      ownerId: row.ownerId,
+      agentId: row.agentId,
+      spendRequestId: row.id,
+      type: "PAYMENT_REVERSED",
+      amountCents: row.totalCents,
+      summary: `PayPal did not complete ${formatUsd(row.totalCents)}; nothing was charged`,
+    });
+    return "reversed";
+  });
+}
+
+// PAYMENT.CAPTURE.REFUNDED / REVERSED: the store refunded (or PayPal reversed)
+// a paid purchase. Recorded for the owner; the hold's spent amount stays, as
+// PayPal does not give a refunded amount back to the authorization.
+export async function captureRefundedAtPayPal(captureId: string, amountCents: number | null, reversed: boolean): Promise<WebhookOutcome> {
+  const [row] = await db.select().from(spendRequests).where(eq(spendRequests.paypalCaptureId, captureId));
+  if (!row) return "not_ours";
+  await logActivity(db, {
+    ownerId: row.ownerId,
+    agentId: row.agentId,
+    spendRequestId: row.id,
+    type: "PAYMENT_REFUNDED",
+    amountCents: amountCents ?? undefined,
+    summary: reversed
+      ? `PayPal reversed ${amountCents ? formatUsd(amountCents) : "a payment"} to the store`
+      : `The store refunded ${amountCents ? formatUsd(amountCents) : "a payment"} to your PayPal`,
+  });
+  return reversed ? "noted_reversal" : "noted_refund";
+}
+
 // ------------------------------------------------------------ approvals
 
 // Releases reservations for approvals that ran out of time. Called before an
