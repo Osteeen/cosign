@@ -654,6 +654,19 @@ export async function resumeStuckPurchases(): Promise<number> {
 
 // Releases reservations for approvals that ran out of time. Called before an
 // owner sees or acts on approvals, so nothing stays held past its expiry.
+// The shared demo account: purchases an earlier visitor left waiting would
+// greet the next one. On each demo sign-in and bot run, anything waiting for
+// more than 15 minutes expires (its reserved amount goes back to the hold), so
+// a visitor sees only what their own run creates.
+export async function clearStaleDemoApprovals(ownerId: string): Promise<void> {
+  if (!isDemoOwner(ownerId)) return;
+  await db
+    .update(approvals)
+    .set({ expiresAt: new Date() })
+    .where(and(eq(approvals.ownerId, ownerId), eq(approvals.status, "PENDING"), lt(approvals.createdAt, new Date(Date.now() - 15 * 60_000))));
+  await expireApprovals(ownerId);
+}
+
 export async function expireApprovals(ownerId: string) {
   await db.transaction(async (tx) => {
     const stale = await tx

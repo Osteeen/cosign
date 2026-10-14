@@ -23,7 +23,7 @@ import { appUrl, ServiceError } from "@/lib/services/common";
 import { CATEGORIES, createSlip, endSlip, renewSlip, setSlipShipTo } from "@/lib/services/slips";
 import { archiveAddress, createAddress, updateAddress } from "@/lib/services/addresses";
 import { confirmOrder, markOrderShipped } from "@/lib/services/orders";
-import { decideApproval } from "@/lib/services/spend";
+import { clearStaleDemoApprovals, decideApproval } from "@/lib/services/spend";
 
 const Uuid = z.uuid();
 const id = (form: FormData, field: string) => {
@@ -260,6 +260,8 @@ export async function demoSignInAction() {
     path: "/",
     expires,
   });
+  // A fresh start: purchases an earlier visitor left waiting are cleared.
+  await clearStaleDemoApprovals(DEMO_OWNER_ID);
   redirect("/?notice=demo-welcome");
 }
 

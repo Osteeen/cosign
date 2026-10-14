@@ -6,6 +6,7 @@ import { problem, rateLimit, tooMany, clientIp } from "@/lib/api";
 import { DEMO_OWNER_ID, demoEnabled, isDemoOwner } from "@/lib/demo/account";
 import { runDemoBot } from "@/lib/demo/bot";
 import { setAgentPaused } from "@/lib/services/agents";
+import { clearStaleDemoApprovals } from "@/lib/services/spend";
 
 // Runs the demo procurement bot for the shared demo account and streams its
 // steps as newline-delimited JSON. Demo account only; rate-limited because each
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
   // The account is shared: if an earlier visitor paused the bot, a run resumes
   // it, so the next visitor never finds the demo broken.
   if (seeded.status === "PAUSED") await setAgentPaused(DEMO_OWNER_ID, seeded.id, false);
+  await clearStaleDemoApprovals(DEMO_OWNER_ID);
   const agent = { ...seeded, status: "ACTIVE" };
 
   const encoder = new TextEncoder();

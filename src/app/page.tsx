@@ -12,6 +12,7 @@ import { BulkNotice, Notice } from "@/components/notice";
 import { BulkApprovals } from "@/components/bulk-approvals";
 import { DemoButton } from "@/components/demo-button";
 import { DemoBotPanel } from "@/components/demo-bot-panel";
+import { DemoTour, HowItWorks, LandingGuide } from "@/components/landing-guide";
 import { demoEnabled, isDemoOwner } from "@/lib/demo/account";
 import { Slip } from "@/components/slip";
 import { Topbar } from "@/components/topbar";
@@ -45,7 +46,16 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
   return (
     <>
       <Topbar />
-      <main className="page">{ownerId ? <Dashboard ownerId={ownerId} notice={notice} bulk={bulk} /> : <Landing demo={demoEnabled()} />}</main>
+      <main className="page">
+        {ownerId ? (
+          <Dashboard ownerId={ownerId} notice={notice} bulk={bulk} />
+        ) : (
+          <>
+            <Landing demo={demoEnabled()} />
+            <LandingGuide demo={demoEnabled()} />
+          </>
+        )}
+      </main>
     </>
   );
 }
@@ -64,6 +74,9 @@ function Landing({ demo }: { demo: boolean }) {
             Sign in to Cosign
           </Link>
           {demo ? <DemoButton /> : <span className="hero-note">No password. We email you a link.</span>}
+        </div>
+        <div className="rise" style={delay(360)}>
+          <HowItWorks />
         </div>
       </div>
       <div className="hero-slip">
@@ -143,7 +156,12 @@ async function Dashboard({ ownerId, notice, bulk }: { ownerId: string; notice?: 
     <div className="dashboard rise">
       <Notice code={notice} />
       <BulkNotice value={bulk} />
-      {isDemoOwner(ownerId) && demoEnabled() ? <DemoBotPanel /> : null}
+      {isDemoOwner(ownerId) && demoEnabled() ? (
+        <>
+          <DemoTour />
+          <DemoBotPanel />
+        </>
+      ) : null}
       {pending.length > 0 ? (
         <section className="panel-stack" aria-labelledby="approvals-title">
           <h2 id="approvals-title" className="section-title">
