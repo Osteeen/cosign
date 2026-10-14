@@ -9,13 +9,13 @@ import { activityEvents, agents, approvals, holds, slips, users } from "@/db/sch
 import { renewalEmail } from "@/lib/email/renewal-email";
 import { sendEmail } from "@/lib/email/send";
 import { addDays, appUrl, logActivity } from "./common";
-import { renewalState, RENEWAL_WINDOW_DAYS, rollOverIfDue } from "./slips";
+import { recoverWaitingHolds, renewalState, RENEWAL_WINDOW_DAYS, rollOverIfDue } from "./slips";
 import { reauthorizeDueHolds } from "./reauth";
 import { isDemoOwner } from "@/lib/demo/account";
 import { expireApprovals } from "./spend";
 
 export async function runDailyJob(now = new Date()) {
-  const result = { rolledOver: 0, remindersSent: 0, reminderFailures: 0, ownersCheckedForApprovals: 0, holdsRenewed: 0 };
+  const result = { rolledOver: 0, remindersSent: 0, reminderFailures: 0, ownersCheckedForApprovals: 0, holdsRenewed: 0, holdsRecovered: 0 };
 
   // 1. Periods that have ended: switch to renewed holds, or expire.
   const ended = await db
@@ -83,5 +83,8 @@ export async function runDailyJob(now = new Date()) {
   // 4. Holds past PayPal's 3-day honor period are renewed ahead of the next
   // purchase (captures renew on demand too; this just keeps agents fast).
   result.holdsRenewed = await reauthorizeDueHolds(now);
+
+  // 5. Holds PayPal placed whose answer never reached Cosign: record or release.
+  result.holdsRecovered = await recoverWaitingHolds(now);
   return result;
 }

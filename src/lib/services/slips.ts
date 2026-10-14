@@ -5,7 +5,7 @@
 // placed. End: the slip stops and every hold is released.
 
 import "server-only";
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { addresses, agents, holds, slips, slipStores, stores } from "@/db/schema";
@@ -233,6 +233,74 @@ export async function reopenFailedHolds(ownerId: string, slipId: string): Promis
   return retry.length;
 }
 
+// Daily: holds still waiting in Cosign an hour after they were opened. If the
+// owner approved at PayPal but neither their return nor PayPal's webhook got
+// through (or an answer was lost), place the hold now; if its slip closed in
+// the meantime, completeHoldApproval releases it at PayPal. Never leaves money
+// held at PayPal without a record here.
+export async function recoverWaitingHolds(now = new Date()): Promise<number> {
+  const waiting = await db
+    .select({ id: holds.id, ownerId: holds.ownerId, orderId: holds.paypalOrderId })
+    .from(holds)
+    .where(and(eq(holds.status, "AWAITING_APPROVAL"), isNotNull(holds.paypalOrderId), lt(holds.createdAt, new Date(now.getTime() - 3_600_000)), gt(holds.createdAt, addDays(now, -29))))
+    .limit(50);
+  let recovered = 0;
+  for (const h of waiting) {
+    try {
+      const order = await getOrder(h.orderId!);
+      // Not approved by the owner yet: nothing is held, nothing to do.
+      if (order.status !== "APPROVED" && order.status !== "COMPLETED") continue;
+      await completeHoldApproval(h.ownerId, h.orderId!);
+      recovered++;
+    } catch (e) {
+      if (!(e instanceof ServiceError)) console.error(`[holds] could not recover hold ${h.id} (${e instanceof PayPalError ? `${e.status} ${e.issue ?? ""}` : e instanceof Error ? e.name : "error"})`);
+    }
+  }
+
+  // Holds closed recently before Cosign knew of an authorization: if PayPal
+  // did place one (its answer was lost), release it so no money stays held.
+  const closed = await db
+    .select({ hold: holds, merchantId: stores.paypalMerchantId, agentId: slips.agentId })
+    .from(holds)
+    .innerJoin(stores, eq(stores.id, holds.storeId))
+    .innerJoin(slips, eq(slips.id, holds.slipId))
+    .where(
+      and(
+        inArray(holds.status, ["RELEASED", "EXPIRED"]),
+        isNull(holds.paypalAuthorizationId),
+        isNotNull(holds.paypalOrderId),
+        gt(holds.releasedAt, addDays(now, -2)),
+      ),
+    )
+    .limit(50);
+  for (const c of closed) {
+    try {
+      const order = await getOrder(c.hold.paypalOrderId!);
+      if (order.status !== "COMPLETED" || !order.placed) continue;
+      // Keep the record, then release it at PayPal.
+      await db.update(holds).set({ paypalAuthorizationId: order.placed.authorizationId }).where(and(eq(holds.id, c.hold.id), isNull(holds.paypalAuthorizationId)));
+      let voided = true;
+      try {
+        await voidHold({ authorizationId: order.placed.authorizationId, storeMerchantId: c.merchantId });
+      } catch (e) {
+        voided = e instanceof PayPalError && e.status === 422;
+      }
+      await logActivity(db, {
+        ownerId: c.hold.ownerId,
+        agentId: c.agentId,
+        type: voided ? "HOLD_RELEASED" : "HOLD_RELEASE_FAILED",
+        summary: voided ? "Released a budget hold PayPal had placed after it was closed" : "A budget hold PayPal placed after it was closed could not be released; it will expire on its own",
+        amountCents: order.placed.amountCents,
+        data: { holdId: c.hold.id, recovered: true },
+      });
+      recovered++;
+    } catch (e) {
+      console.error(`[holds] could not check closed hold ${c.hold.id} (${e instanceof PayPalError ? `${e.status} ${e.issue ?? ""}` : e instanceof Error ? e.name : "error"})`);
+    }
+  }
+  return recovered;
+}
+
 // The owner is back from PayPal. Only the signed-in owner's own hold can be
 // placed, and only if PayPal shows exactly the store and amount we asked for.
 export async function completeHoldApproval(ownerId: string, orderId: string): Promise<{ agentId: string }> {
@@ -249,13 +317,13 @@ export async function completeHoldApproval(ownerId: string, orderId: string): Pr
   }
 
   const order = await getOrder(orderId);
-  // COMPLETED means an earlier return already authorized it; authorizing again
-  // with the same request ID returns that same authorization.
   if (order.status !== "APPROVED" && order.status !== "COMPLETED") {
     throw new ServiceError(409, "not_approved", "PayPal has not approved this hold yet.");
   }
-
-  const placed = await authorizeOrder(orderId);
+  // COMPLETED: PayPal already placed the hold (an earlier answer may have been
+  // lost). Record that authorization as it is; authorizing again could be
+  // refused once PayPal forgets the request ID.
+  const placed = order.status === "COMPLETED" && order.placed ? order.placed : await authorizeOrder(orderId);
   if (placed.payeeMerchantId !== hold.merchantId || placed.amountCents !== hold.hold.amountCents) {
     // Should never happen: refuse to use a hold that differs from what we asked for.
     throw new ServiceError(409, "hold_mismatch", "PayPal returned a different store or amount. The hold was not used.");
@@ -268,9 +336,10 @@ export async function completeHoldApproval(ownerId: string, orderId: string): Pr
       .set({
         status: "ACTIVE",
         paypalAuthorizationId: placed.authorizationId,
-        authorizedAt: now,
-        honorPeriodEndsAt: addDays(now, HONOR_PERIOD_DAYS),
-        expiresAt: placed.expiresAt ?? addDays(now, 29),
+        // PayPal's own times: a hold recovered later keeps its real age.
+        authorizedAt: placed.authorizedAt ?? now,
+        honorPeriodEndsAt: addDays(placed.authorizedAt ?? now, HONOR_PERIOD_DAYS),
+        expiresAt: placed.expiresAt ?? addDays(placed.authorizedAt ?? now, 29),
       })
       .where(and(eq(holds.id, hold.hold.id), eq(holds.ownerId, ownerId), eq(holds.status, "AWAITING_APPROVAL")))
       .returning({ slipId: holds.slipId });

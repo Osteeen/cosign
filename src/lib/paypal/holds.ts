@@ -6,6 +6,7 @@ import "server-only";
 import {
   CheckoutPaymentIntent,
   FulfillmentType,
+  type Order,
   OrdersController,
   PaymentsController,
   PaypalExperienceUserAction,
@@ -83,31 +84,44 @@ export async function createHoldOrder(input: {
   return { orderId: order.id, approveUrl };
 }
 
-export async function getOrder(orderId: string): Promise<{ id: string; status: string }> {
-  const order = await call("get order", () => orders().getOrder({ id: orderId }));
-  return { id: order.id ?? orderId, status: order.status ?? "UNKNOWN" };
-}
-
-// Places the hold after the owner approved it. Idempotent per order.
-export async function authorizeOrder(orderId: string): Promise<{
+export type PlacedHold = {
   authorizationId: string;
   amountCents: number;
   payeeMerchantId: string | null;
+  authorizedAt: Date | null;
   expiresAt: Date | null;
-}> {
-  const order = await call("authorize order", () =>
-    orders().authorizeOrder({ id: orderId, paypalRequestId: `authorize-${orderId}`, prefer: FULL, body: {} }),
-  );
+};
+
+// The budget hold inside an order, if PayPal has placed one.
+function placedHoldOf(order: Order): PlacedHold | null {
   const unit = order.purchaseUnits?.[0];
   const auth = unit?.payments?.authorizations?.[0];
-  if (!auth?.id || !auth.amount) throw new Error("PayPal returned no authorization");
+  if (!auth?.id || !auth.amount) return null;
   if (auth.amount.currencyCode !== "USD") throw new Error("Unexpected currency on hold");
   return {
     authorizationId: auth.id,
     amountCents: payPalToCents(auth.amount.value),
     payeeMerchantId: unit?.payee?.merchantId ?? null,
+    authorizedAt: auth.createTime ? new Date(auth.createTime) : null,
     expiresAt: auth.expirationTime ? new Date(auth.expirationTime) : null,
   };
+}
+
+// The order's status, and its hold if one was already placed (status
+// COMPLETED) - e.g. when our authorize call's answer was lost.
+export async function getOrder(orderId: string): Promise<{ id: string; status: string; placed: PlacedHold | null }> {
+  const order = await call("get order", () => orders().getOrder({ id: orderId }));
+  return { id: order.id ?? orderId, status: order.status ?? "UNKNOWN", placed: placedHoldOf(order) };
+}
+
+// Places the hold after the owner approved it. Idempotent per order.
+export async function authorizeOrder(orderId: string): Promise<PlacedHold> {
+  const order = await call("authorize order", () =>
+    orders().authorizeOrder({ id: orderId, paypalRequestId: `authorize-${orderId}`, prefer: FULL, body: {} }),
+  );
+  const placed = placedHoldOf(order);
+  if (!placed) throw new Error("PayPal returned no authorization");
+  return placed;
 }
 
 // One agent purchase. requestId is derived from the spend request, so a retry
