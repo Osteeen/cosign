@@ -31,10 +31,12 @@ export async function authorizationForCapture(holdId: string, now = new Date()):
   const current = hold.paypalCurrentAuthorizationId ?? hold.paypalAuthorizationId!;
 
   const stale = hold.status === "ACTIVE" && hold.honorPeriodEndsAt !== null && hold.honorPeriodEndsAt <= now && (hold.expiresAt === null || hold.expiresAt > now);
-  if (!stale) return current;
+  // Renew only what is left of the hold; a fully spent hold has nothing to renew.
+  const left = hold.amountCents - hold.capturedCents;
+  if (!stale || left <= 0) return current;
 
   try {
-    const renewed = await reauthorizeHold({ authorizationId: current, storeMerchantId: row.merchantId });
+    const renewed = await reauthorizeHold({ authorizationId: current, storeMerchantId: row.merchantId, amountCents: left });
     // Only the first of several parallel renewals writes; the rest read its result.
     const [updated] = await db
       .update(holds)

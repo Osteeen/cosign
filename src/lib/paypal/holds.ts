@@ -114,16 +114,26 @@ export async function captureFromHold(input: {
 
 // Renews a hold past PayPal's 3-day honor period. PayPal answers with a NEW
 // authorization ID for the same hold (same 29-day expiry); captures go to the
-// new ID, voids must still name the original. The request ID is tied to the
-// authorization being renewed, so a retry or a parallel call gets the same answer.
-export async function reauthorizeHold(input: { authorizationId: string; storeMerchantId: string }): Promise<{ authorizationId: string; status: string }> {
+// new ID, voids must still name the original. The amount must be what is left
+// of the hold: with no amount PayPal reauthorizes the full original, and refuses
+// (422 AUTHORIZATION_AMOUNT_EXCEEDED) once anything was captured - tested in
+// sandbox Oct 14, 2026. The request ID is tied to the authorization and the
+// amount, so a retry or a parallel call gets the same answer and a different
+// amount can never reuse it.
+export async function reauthorizeHold(input: {
+  authorizationId: string;
+  storeMerchantId: string;
+  amountCents: number;
+}): Promise<{ authorizationId: string; status: string }> {
+  if (!Number.isInteger(input.amountCents) || input.amountCents <= 0) throw new Error("reauthorize needs a positive amount in cents");
   const attempt = (asStore: boolean) =>
     call("reauthorize", () =>
       payments().reauthorizePayment({
         authorizationId: input.authorizationId,
-        paypalRequestId: `reauth-${input.authorizationId}${asStore ? "-as-store" : ""}`,
+        paypalRequestId: `reauth-${input.authorizationId}-${input.amountCents}${asStore ? "-as-store" : ""}`,
         prefer: FULL,
         ...(asStore ? { paypalAuthAssertion: authAssertion(input.storeMerchantId) } : {}),
+        body: { amount: { currencyCode: "USD", value: centsToPayPal(input.amountCents) } },
       }),
     );
   let auth;
