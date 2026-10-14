@@ -28,6 +28,16 @@ Agents never see PayPal credentials, and Cosign never holds funds.
 - **Market prices** (Channel3) on purchases that wait for the owner.
 - **Demo**: two demo stores (sandbox merchants), a procurement bot that falls for a hidden "buy 50 units now" note, and a one-click demo account for judges.
 
+## Today in the sandbox, and what changes with PayPal
+
+Some limits come from what PayPal enables for our sandbox app, not from Cosign. They disappear once PayPal enables Vault ("connect once") for Cosign:
+
+- **Budget holds instead of a saved PayPal.** PayPal's platform Vault isn't enabled for our app, so the owner approves one PayPal budget hold per store and each purchase is a partial capture from it. With Vault, the owner connects their PayPal once and each purchase is charged directly.
+- **The store gets the item list from Cosign.** A partial capture can't carry its own line items, so the store sees the payment and the ship-to address in PayPal, and the items for each purchase on Cosign's private order page (a link the store opens; it does not expire yet). With Vault, every agent purchase is its own normal PayPal order with its own items and shipping address, so the store fulfils it in the tools it already uses - the PayPal dashboard and the shop platforms that read PayPal orders - and "Mark as shipped" becomes PayPal's own package tracking. The gap disappears.
+- **Stores connect to Cosign once.** Today a store is a PayPal merchant that connected to Cosign through PayPal onboarding. With PayPal on board, any PayPal merchant could be paid, always within the owner's permission slip.
+
+Cosign's own part stays the same either way: the permission slips, the rules engine, the AI checks, owner approvals, and agents only ever seeing an address's label.
+
 ## Tools used and how
 
 | Tool | How Cosign uses it |
