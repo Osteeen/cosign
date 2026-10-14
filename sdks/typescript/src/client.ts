@@ -6,6 +6,7 @@ import * as host from "./core/runtime-environment.js";
 import * as s from "./core/validation/index.js";
 import { Agent } from "./resources/agent.js";
 import { Authentication } from "./resources/authentication.js";
+import { Products } from "./resources/products.js";
 import { SpendRequests } from "./resources/spend-requests.js";
 import { buildServers, type Servers } from "./servers.js";
 
@@ -22,6 +23,8 @@ import { buildServers, type Servers } from "./servers.js";
  *
  * 1. `POST /agent/token` - exchange the agent's API key for a 15-minute token.
  * 2. `GET /agent/me` - the remaining budget, the limits and the stores the agent can pay right now.
+ *    Optionally, `GET /agent/products?q=...` finds products at those stores, says what the rules
+ *    would decide, and compares prices at other retailers.
  * 3. `POST /agent/spend-requests` - ask to pay. The answer is one of:
  *    - `COMPLETED` - paid through PayPal inside the request; a receipt is returned.
  *    - `PENDING_APPROVAL` - waiting for the owner. Poll `GET
@@ -62,7 +65,8 @@ import { buildServers, type Servers } from "./servers.js";
  * MCP-capable AI assistants can use Cosign without an SDK: the MCP endpoint is `POST
  * https://cosign-rd24.onrender.com/api/mcp` (streamable HTTP, stateless), with the agent key as
  * `Authorization: Bearer key_...:cs_...`. Its tools mirror this API: `cosign_get_allowance`,
- * `cosign_request_purchase`, `cosign_get_purchase`, `cosign_list_purchases`.
+ * `cosign_find_products`, `cosign_request_purchase`, `cosign_get_purchase`,
+ * `cosign_list_purchases`.
  *
  * ## Sandbox
  *
@@ -75,6 +79,7 @@ export class CosignAgentApiClient {
   readonly #auth: AuthSchemes;
   #authentication?: Authentication;
   #agent?: Agent;
+  #products?: Products;
   #spendRequests?: SpendRequests;
 
   constructor(options: ClientOptions = {}) {
@@ -109,6 +114,13 @@ export class CosignAgentApiClient {
    */
   get agent(): Agent {
     return (this.#agent ??= new Agent(this.#rawClient, this.#servers, this.#auth));
+  }
+
+  /**
+   * Find products at the stores this agent can pay, and compare prices elsewhere.
+   */
+  get products(): Products {
+    return (this.#products ??= new Products(this.#rawClient, this.#servers, this.#auth));
   }
 
   /**

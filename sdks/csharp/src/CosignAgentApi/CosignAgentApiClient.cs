@@ -23,7 +23,9 @@ namespace CosignAgentApi;
 /// <para>
 /// 1. <c>POST /agent/token</c> - exchange the agent's API key for a 15-minute token.
 /// 2. <c>GET /agent/me</c> - the remaining budget, the limits and the stores the
-///    agent can pay right now.
+///    agent can pay right now. Optionally, <c>GET /agent/products?q=...</c> finds
+///    products at those stores, says what the rules would decide, and compares
+///    prices at other retailers.
 /// 3. <c>POST /agent/spend-requests</c> - ask to pay. The answer is one of:
 ///    - <c>COMPLETED</c> - paid through PayPal inside the request; a receipt is returned.
 ///    - <c>PENDING_APPROVAL</c> - waiting for the owner. Poll
@@ -74,7 +76,7 @@ namespace CosignAgentApi;
 /// MCP-capable AI assistants can use Cosign without an
 /// SDK: the MCP endpoint is <c>POST https://cosign-rd24.onrender.com/api/mcp</c> (streamable HTTP,
 /// stateless), with the agent key as <c>Authorization: Bearer key_...:cs_...</c>.
-/// Its tools mirror this API: <c>cosign_get_allowance</c>,
+/// Its tools mirror this API: <c>cosign_get_allowance</c>, <c>cosign_find_products</c>,
 /// <c>cosign_request_purchase</c>, <c>cosign_get_purchase</c>, <c>cosign_list_purchases</c>.
 /// </para>
 /// <para>
@@ -131,6 +133,11 @@ public sealed class CosignAgentApiClient
     /// Exchange the agent's API key for a short-lived token.
     /// </summary>
     public AuthenticationApi AuthenticationApi => field ??= new AuthenticationApi(_rawClient, _server, _auth);
+
+    /// <summary>
+    /// Find products at the stores this agent can pay, and compare prices elsewhere.
+    /// </summary>
+    public Products Products => field ??= new Products(_rawClient, _server, _auth);
 
     /// <summary>
     /// Ask to pay a store, and follow up on earlier requests.

@@ -23,7 +23,9 @@ This API is what **agents** call. Owners use the Cosign web app.
 
 1. `POST /agent/token` - exchange the agent's API key for a 15-minute token.
 2. `GET /agent/me` - the remaining budget, the limits and the stores the
-   agent can pay right now.
+   agent can pay right now. Optionally, `GET /agent/products?q=...` finds
+   products at those stores, says what the rules would decide, and compares
+   prices at other retailers.
 3. `POST /agent/spend-requests` - ask to pay. The answer is one of:
    - `COMPLETED` - paid through PayPal inside the request; a receipt is returned.
    - `PENDING_APPROVAL` - waiting for the owner. Poll
@@ -68,7 +70,7 @@ a sign the agent was manipulated by a web page.
 MCP-capable AI assistants can use Cosign without an
 SDK: the MCP endpoint is `POST https://cosign-rd24.onrender.com/api/mcp` (streamable HTTP,
 stateless), with the agent key as `Authorization: Bearer key_...:cs_...`.
-Its tools mirror this API: `cosign_get_allowance`,
+Its tools mirror this API: `cosign_get_allowance`, `cosign_find_products`,
 `cosign_request_purchase`, `cosign_get_purchase`, `cosign_list_purchases`.
 
 ## Sandbox
@@ -160,7 +162,7 @@ Two generated references cover the SDK; each answers a different question:
 | **[API Reference](api-reference.md)** | Usage guidance for a single **parsed** operation: `client.<group>.<operation>(...)` returns the typed payload and raises `ApiError` on any non-2xx, with `.error` the typed error body, or `RawError` for a status the operation does not document. |
 | **[Raw API Reference](raw-api-reference.md)** | The same for the **raw** variant: `client.<group>.with_raw_response.<operation>(...)` returns `ApiResult[T, E]` and never raises for an API error. |
 
-Both API references carry every one of the 5 operations, with a sync and an async sample and a parameter table each.
+Both API references carry every one of the 6 operations, with a sync and an async sample and a parameter table each.
 
 ## SDK map
 

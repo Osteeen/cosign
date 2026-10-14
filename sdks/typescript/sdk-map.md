@@ -34,7 +34,7 @@ const client = new CosignAgentApiClient({
 });
 ```
 
-The only constructor is `new CosignAgentApiClient(options: ClientOptions = {})`, so `new CosignAgentApiClient()` is the minimum. Resources are memoized lazy getters on the client — `client.authentication`, `client.agent`, `client.spendRequests` — and their classes are exported only for their merged namespaces and for `instanceof`; their constructors take engine internals that are not exported, so reach a resource only through its getter.
+The only constructor is `new CosignAgentApiClient(options: ClientOptions = {})`, so `new CosignAgentApiClient()` is the minimum. Resources are memoized lazy getters on the client — `client.authentication`, `client.agent`, `client.products`, `client.spendRequests` — and their classes are exported only for their merged namespaces and for `instanceof`; their constructors take engine internals that are not exported, so reach a resource only through its getter.
 
 All `ClientOptions` fields (source: `src/client-options.ts`; every field is `readonly`):
 
@@ -216,11 +216,11 @@ try {
 
 `result.payload` is the same `ErrorPayload<P>` a thrown `ApiError` carries on `err.payload`, and `result.message`, `result.method` and `result.uri` are that error's own members — so the **Error arms** bullet on an operation's page enumerates the payload either way, and the `catch` above it is for the rest of the family. `result.method` and `result.uri` are named on this map alone.
 
-Of **5 operations**, **5** declare typed error bodies and **0** reject with the base `ApiError`, whose payload is always the `"undeclared"` arm.
+Of **6 operations**, **6** declare typed error bodies and **0** reject with the base `ApiError`, whose payload is always the `"undeclared"` arm.
 
 ---
 
-## Operations — by resource (3 groups, 5 operations)
+## Operations — by resource (4 groups, 6 operations)
 
 Each page below carries one block per operation, with bullets in the fixed order **Server**, **Signature**, **Wire**, **Auth**, **Request body**, **SDK-sent**, **Returns**, **Error**, **Error arms**, then a **Fields** table mapping every request field to the channel it travels on, and a **Type sources** table naming the declaring file and schema value of every type the operation mentions. With `api-reference.md` documenting operations only, that table is the route from an operation to the file declaring what it takes.
 
@@ -258,6 +258,7 @@ Each page below carries one block per operation, with bullets in the fixed order
 | --- | --- | --- |
 | `authentication` | 1 | [map/operations/authentication.md](map/operations/authentication.md) |
 | `agent` | 1 | [map/operations/agent.md](map/operations/agent.md) |
+| `products` | 1 | [map/operations/products.md](map/operations/products.md) |
 | `spendRequests` | 3 | [map/operations/spend-requests.md](map/operations/spend-requests.md) |
 
 ---
@@ -268,9 +269,9 @@ Each page below carries one block per operation, with bullets in the fixed order
 
 | Group | Count | Directory |
 | --- | --- | --- |
-| Objects (plain `type`, no class) | 16 | `src/models/` |
-| Enums (open; const companion plus schema) | 8 | `src/models/` |
-| Typed error classes (`ApiError` subclass, one per typed operation) | 5 | `src/resources/`, in the declaring module's namespace |
+| Objects (plain `type`, no class) | 24 | `src/models/` |
+| Enums (open; const companion plus schema) | 9 | `src/models/` |
+| Typed error classes (`ApiError` subclass, one per typed operation) | 6 | `src/resources/`, in the declaring module's namespace |
 
 Conventions: every model is a plain `type`, not a class — build one with an object literal; there is no constructor and no builder. `f: T` is required, `f?: T` is optional (omit the key), and `f: T | null` is a **required, nullable** field where `null` is a value distinct from an omitted key. Optional properties are declared `f?: T`, not `f?: T | undefined`, so under `exactOptionalPropertyTypes` you must **omit or spread** an absent field rather than assign `undefined` to it. A schema value is directly usable both ways: `Schema<T, W = Encoded<T>>` is `{ decode(v: unknown): T; encode(v: unknown): W }`, and `Encoded<T>` is the wire projection — a `Date` becomes `string | number`, a `Uint8Array` becomes a base64 `string`, recursing through arrays and objects. `EnumSchema<T>` adds `readonly values: readonly T[]`, so an enum's known set is testable at run time. Enums are **not** TypeScript `enum`s and are open: a `const` companion plus a union that includes `(string & {})` or `(number & {})`, so **any** value of the base type is assignable and the schema validates the base type only, never membership — read the member names and the values they send off the companion, and use `.values` to test membership yourself. A discriminated union is narrowed with an exhaustive `switch` on its tag, with no fallback arm and no type guard to import; one without a discriminant is narrowed on the shape of its arms, which its declaration spells out. A property default is filled by the SDK on **encode as well as decode**, so omitting one still sends it — read it off the `defaulted(…)` entry in the schema, or off the property's `@default`. A numeric property is a `number` whatever its format, and its schema follows the type. `type: integer` with no format, `int32` or `int64` rejects a fraction and any value outside the safe-integer range; `type: number` with no format, `float`, `double` or `bigdecimal` rejects a non-finite value. A property's wire name is its `_keysMap` entry in the schema and may differ from the TypeScript name — read it there rather than deriving it. A named spec schema whose resolved form is a bare container, or which is used only as a form-encoded body, gets no model file and no exported name: the first is written inline at each use site, the second is flattened onto the operation's request type, one field per property, so read that field list from the request type.
 
@@ -284,7 +285,7 @@ import { type AgentStatus, agentStatusSchema } from "cosign-agent-api";
 
 ## Servers & auth
 
-**Authentication is per operation.** Every operation declares the requirement it enforces and the SDK sends exactly that: **5 of the 5 operations** require a credential and **0** are public. Each block on a page above carries an **Auth** bullet naming its requirement, `none` included. There is no client-global switch and no per-call override.
+**Authentication is per operation.** Every operation declares the requirement it enforces and the SDK sends exactly that: **6 of the 6 operations** require a credential and **0** are public. Each block on a page above carries an **Auth** bullet naming its requirement, `none` included. There is no client-global switch and no per-call override.
 
 | Scheme (as an **Auth** bullet names it) | Configured with | What the SDK sends |
 | --- | --- | --- |

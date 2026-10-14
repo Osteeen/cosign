@@ -94,7 +94,7 @@ Core error types (`src/CosignAgentApi/Core/ErrorResponse/`) — public members w
 
 | Type | Public members | Source |
 | --- | --- | --- |
-| `ApiError` — abstract base of the 5 typed error classes in `src/CosignAgentApi/Errors/` | `TryGetRawError(out RawError error): bool` | `src/CosignAgentApi/Core/ErrorResponse/ApiError.cs` |
+| `ApiError` — abstract base of the 6 typed error classes in `src/CosignAgentApi/Errors/` | `TryGetRawError(out RawError error): bool` | `src/CosignAgentApi/Core/ErrorResponse/ApiError.cs` |
 | `RawError` | `StatusCode: HttpStatusCode` · `ReadAsBytes(): ReadOnlyMemory<byte>` · `ReadAsString(): string` · `ReadAsJson<T>(): T?` | `src/CosignAgentApi/Core/ErrorResponse/RawError.cs` |
 
 Typed-error payload shapes (the `out` types in each operation page's error-accessor cells) are ordinary records/unions — no special handling. The operation's **Type sources** table gives the file that declares each one; read field names, declared types, and JSON wire names there, as for any other model.
@@ -123,11 +123,11 @@ catch (ApiException<RawError> ex)
 }
 ```
 
-**No-throw (`…Result`) variants: absent across this SDK** — every operation is throw-only. Of **5 operations**, **5 are Case A (typed)** and **0 are Case B (raw)**.
+**No-throw (`…Result`) variants: absent across this SDK** — every operation is throw-only. Of **6 operations**, **6 are Case A (typed)** and **0 are Case B (raw)**.
 
 ---
 
-## Operations — by controller (3 groups, 5 operations)
+## Operations — by controller (4 groups, 6 operations)
 
 Each links to a sub-page with one row per operation: signature, the request record's required members, query-param wire names, return type, error Case A/B, and Case A's typed accessors with their statuses. Each operation also carries a **Type sources** table — every type it names, with the file that declares it — so resolving a body, return, or error payload to its source is a lookup, never a search. `RawError` is excluded there (its members and path are above); an operation with no table names nothing but primitives and `RawError`.
 
@@ -149,6 +149,7 @@ Each links to a sub-page with one row per operation: signature, the request reco
 | --- | --- | --- |
 | `Agent` | 1 | [map/operations/Agent.md](map/operations/Agent.md) |
 | `AuthenticationApi` | 1 | [map/operations/AuthenticationApi.md](map/operations/AuthenticationApi.md) |
+| `Products` | 1 | [map/operations/Products.md](map/operations/Products.md) |
 | `SpendRequests` | 3 | [map/operations/SpendRequests.md](map/operations/SpendRequests.md) |
 
 ---
@@ -159,10 +160,10 @@ Each links to a sub-page with one row per operation: signature, the request reco
 
 | Group | Count | Directory (file = `<TypeName>.cs`) |
 | --- | --- | --- |
-| Records (plain `record` data models) | 16 | `src/CosignAgentApi/Models/` |
-| Enums (`OpenStringEnum<T>` / `OpenIntEnum<T>`) — C# member names + wire values | 8 | `src/CosignAgentApi/Models/Enums/` |
-| Typed error classes (`: ApiError`, one per Case A operation) | 5 | `src/CosignAgentApi/Errors/` |
-| Request records (one per operation that takes input; never serialized) | 3 | `src/CosignAgentApi/Requests/` — a controller's records sit in a folder named after it (an operation with several tags is filed under the first tag it declares) |
+| Records (plain `record` data models) | 24 | `src/CosignAgentApi/Models/` |
+| Enums (`OpenStringEnum<T>` / `OpenIntEnum<T>`) — C# member names + wire values | 9 | `src/CosignAgentApi/Models/Enums/` |
+| Typed error classes (`: ApiError`, one per Case A operation) | 6 | `src/CosignAgentApi/Errors/` |
+| Request records (one per operation that takes input; never serialized) | 4 | `src/CosignAgentApi/Requests/` — a controller's records sit in a folder named after it (an operation with several tags is filed under the first tag it declares) |
 
 Conventions: records are immutable, `init`-only; `required` properties must be set in the object initializer; `T?` is optional. A field's wire name is its `[JsonPropertyName]` and often differs from the C# name (`AmountInCents` ↔ `amount_in_cents`) — read it off the property, don't derive it. `OneOf`/`AnyOf` unions wrap `Optional<T>` variants — build via static factory or implicit conversion, read via `TryGet…(out …)`; `AllOf` compositions are not unions — every constituent is a `required` property, so set them all, and those constituent properties carry no `[JsonPropertyName]` and have no wire name of their own, because the generated converter flattens each constituent's own fields directly into the one parent JSON object. Enums are **not** C# enums — use the static members, whose names are PascalCase even when the wire value isn't (`CollectionMethod.Invoice`, not `.invoice`); there is no public factory, so resolve a raw value with `TryGetKnownValue` and branch with the generated `Match`, whose `otherwise` arm receives any value the SDK does not declare.
 

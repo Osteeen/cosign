@@ -7,6 +7,7 @@ from typing_extensions import Self
 
 from .apis.agent import AsyncAgent
 from .apis.authentication import AsyncAuthentication
+from .apis.products import AsyncProducts
 from .apis.spend_requests import AsyncSpendRequests
 from .auth import AsyncAuthSchemes
 from .base_client import DEFAULT_TIMEOUT, BaseCosignAgentApiClient
@@ -64,6 +65,10 @@ class AsyncCosignAgentApiClient(BaseCosignAgentApiClient[AsyncRawClient]):
     @cached_property
     def authentication(self) -> AsyncAuthentication:
         return AsyncAuthentication(self._raw_client, self._server, self._auth)
+
+    @cached_property
+    def products(self) -> AsyncProducts:
+        return AsyncProducts(self._raw_client, self._server, self._auth)
 
     @cached_property
     def spend_requests(self) -> AsyncSpendRequests:

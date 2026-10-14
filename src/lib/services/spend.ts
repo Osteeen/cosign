@@ -23,7 +23,7 @@ import { PayPalError } from "@/lib/paypal/client";
 import { cartHash } from "@/lib/rules/cart-hash";
 import { checkIntent } from "@/lib/ai/intent-check";
 import { applyIntentCheck, evaluate } from "@/lib/rules/engine";
-import type { FinalDecision, IntentResult, SpendRequestInput } from "@/lib/rules/types";
+import type { Category, FinalDecision, IntentResult, SpendRequestInput } from "@/lib/rules/types";
 import { formatUsd } from "@/lib/money";
 import { logActivity, notFound, ServiceError, sha256, type Tx } from "./common";
 import { notifyApprovalNeeded } from "./notify";
@@ -113,6 +113,19 @@ function runRules(ctx: Awaited<ReturnType<typeof loadContext>>, request: SpendRe
     request,
     now: new Date(),
   });
+}
+
+// What the rules alone would decide for buying one item at a store, without
+// asking: no locks, no writes, no AI check (which can only make it stricter).
+// Used to show agents what they can buy before they try.
+export async function previewRules(agentId: string, storeId: string, item: { name: string; category: Category; unitAmountCents: number }) {
+  const ctx = await loadContext(db, agentId, storeId, false);
+  const decision = runRules(ctx, {
+    storeId,
+    items: [{ name: item.name, category: item.category, quantity: 1, unitAmountCents: item.unitAmountCents }],
+    total: { amountCents: item.unitAmountCents, currency: "USD" },
+  });
+  return { outcome: decision.outcome, reasons: decision.reasons };
 }
 
 export async function createSpendRequest(agentId: string, idempotencyKey: string, body: SpendBody): Promise<{ row: SpendRow; replay: boolean }> {

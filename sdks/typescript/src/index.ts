@@ -5,6 +5,7 @@ export type { BasicAuthCredentials, TokenProvider } from "./core/auth/credential
 
 export { Authentication } from "./resources/authentication.js";
 export { Agent } from "./resources/agent.js";
+export { Products } from "./resources/products.js";
 export { SpendRequests } from "./resources/spend-requests.js";
 
 export { AgentStatus, agentStatusSchema } from "./models/agent-status.js";
@@ -17,12 +18,18 @@ export { DecisionOutcome, decisionOutcomeSchema } from "./models/decision-outcom
 export { intentCheckSchema, type IntentCheck } from "./models/intent-check.js";
 export { IntentVerdict, intentVerdictSchema } from "./models/intent-verdict.js";
 export { lineItemSchema, type LineItem } from "./models/line-item.js";
+export { marketComparisonSchema, type MarketComparison } from "./models/market-comparison.js";
+export { marketOfferSchema, type MarketOffer } from "./models/market-offer.js";
+export { marketPricesSchema, type MarketPrices } from "./models/market-prices.js";
+export { MarketVerdict, marketVerdictSchema } from "./models/market-verdict.js";
 export { moneySchema, type Money } from "./models/money.js";
 export { problemSchema, type Problem } from "./models/problem.js";
 export { problemErrorSchema, type ProblemError } from "./models/problem-error.js";
+export { productSearchSchema, type ProductSearch } from "./models/product-search.js";
 export { reasonSchema, type Reason } from "./models/reason.js";
 export { ReasonCode, reasonCodeSchema } from "./models/reason-code.js";
 export { receiptSchema, type Receipt } from "./models/receipt.js";
+export { rulesPreviewSchema, type RulesPreview } from "./models/rules-preview.js";
 export { slipSchema, type Slip } from "./models/slip.js";
 export { spendRequestSchema, type SpendRequest } from "./models/spend-request.js";
 export { spendRequestCreateSchema, type SpendRequestCreate } from "./models/spend-request-create.js";
@@ -30,6 +37,9 @@ export { spendRequestListSchema, type SpendRequestList } from "./models/spend-re
 export { SpendRequestStatus, spendRequestStatusSchema } from "./models/spend-request-status.js";
 export { storeSchema, type Store } from "./models/store.js";
 export { storeAllowanceSchema, type StoreAllowance } from "./models/store-allowance.js";
+export { storeProductSchema, type StoreProduct } from "./models/store-product.js";
+export { storeRefSchema, type StoreRef } from "./models/store-ref.js";
+export { storeSummarySchema, type StoreSummary } from "./models/store-summary.js";
 export { TokenType, tokenTypeSchema } from "./models/token-type.js";
 
 export {

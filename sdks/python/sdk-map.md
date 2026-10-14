@@ -145,11 +145,11 @@ except ApiError as e:
         print(e.status_code, e.error.text())
 ```
 
-**Raw (`.with_raw_response`) variants: present on every operation** — the same call returns `ApiResult` instead of raising, with the same body on `Failure.error`. Of **5 operations**, **5 are Case A (typed)** and **0 are Case B (raw)**.
+**Raw (`.with_raw_response`) variants: present on every operation** — the same call returns `ApiResult` instead of raising, with the same body on `Failure.error`. Of **6 operations**, **6 are Case A (typed)** and **0 are Case B (raw)**.
 
 ---
 
-## Operations — by controller (3 pages, 5 operations)
+## Operations — by controller (4 pages, 6 operations)
 
 Each links to a sub-page with one block per operation, headed by its full accessor path: the HTTP verb and route (for a mock, a raw request or a provider-side log — never reconstruct it from the method name), the sync parsed signature with its required positional parameters, each parameter's role and — where it differs — wire name, both return types, and its error case — **Case A** names the alias and the status each arm maps from, **Case B** names `RawError`. Every block also carries a **Type sources** table — every *generated* type it names, with the module that declares it. A runtime type — a file alias, a date/time or byte converter — is not listed there.
 
@@ -173,6 +173,7 @@ Sub-pages chunk per `###` block: each block is self-contained given the table ab
 | --- | --- | --- |
 | `client.agent` | 1 | [map/operations/agent.md](map/operations/agent.md) |
 | `client.authentication` | 1 | [map/operations/authentication.md](map/operations/authentication.md) |
+| `client.products` | 1 | [map/operations/products.md](map/operations/products.md) |
 | `client.spend_requests` | 3 | [map/operations/spend_requests.md](map/operations/spend_requests.md) |
 
 ---
@@ -183,9 +184,9 @@ Sub-pages chunk per `###` block: each block is self-contained given the table ab
 
 | Group | Count | Directory (module = `<type_name>.py`) |
 | --- | --- | --- |
-| Models (`SdkBaseModel` pydantic classes) | 16 | `cosign_agent_api/models/` |
-| Enums (`Enum` over `str`) — Python member names + wire values | 8 | `cosign_agent_api/models/enums/` |
-| Error aliases (one per Case A operation) | 5 | `cosign_agent_api/errors/` |
+| Models (`SdkBaseModel` pydantic classes) | 24 | `cosign_agent_api/models/` |
+| Enums (`Enum` over `str`) — Python member names + wire values | 9 | `cosign_agent_api/models/enums/` |
+| Error aliases (one per Case A operation) | 6 | `cosign_agent_api/errors/` |
 
 Conventions: a model is a `SdkBaseModel` (pydantic) class; a field whose wire name differs from its Python name carries it as `Field(alias=…)` (`type_` ↔ `"type"`) — read the alias off the field rather than deriving it. An omittable field is annotated `Optional[T]` and defaults to `UNSET`, and one that may also be explicitly null is `OptionalNullable[T]`; both come from `core` and neither is `typing.Optional` — there is no `None` arm unless the spec declared the property nullable, so passing `None` to the first is a type error rather than a value that serializes.
 

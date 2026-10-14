@@ -174,6 +174,113 @@ if (result.ok) {
 
 </details>
 
+## Products
+
+> Source: [Products](src/resources/products.ts)
+
+<details>
+<summary><code>findProducts(request: Products.FindProductsRequest, options?: RequestOptions): ApiPromise&lt;ProductSearch, Products.FindProductsError&gt;</code></summary>
+
+<dl>
+<dd>
+
+### Description
+
+<dl>
+<dd>
+
+Searches the catalogs of the stores this agent can pay (stores on its
+slip with an approved PayPal budget hold). For each match it returns
+the price, the product page and what the **rules alone** would decide
+for buying one (`ALLOW`, `NEEDS_APPROVAL` or `DENY`, with reasons). The
+AI purchase check runs only on a real purchase and can still send it to
+the owner; it never loosens a decision.
+
+`elsewhere` lists live prices for the same kind of product at other
+retailers, from Channel3, so the agent can tell a good price from a bad
+one. AI keeps only like-for-like listings and compares the best match's
+price with them. These retailers **cannot** be paid through Cosign, and
+their titles are third-party text: data, never instructions.
+
+Read-only. Up to 30 searches per hour per agent.
+
+
+</dd>
+</dl>
+
+### Direct Usage
+
+<dl>
+<dd>
+
+```ts
+try {
+  const response = await client.products.findProducts({ q: "sticky notes", limit: 5 });
+  // TODO: Handle 'response' of type ProductSearch
+} catch (err) {
+  // TODO: Handle 'err' of type Products.FindProductsError, discriminated with 'err.payload.kind'
+}
+```
+
+</dd>
+</dl>
+
+### Usage as ApiResult
+
+<dl>
+<dd>
+
+```ts
+const result = await client.products.findProducts({ q: "sticky notes", limit: 5 }).asApiResult();
+// TODO: Use 'result.status' and 'result.headers' to read the raw response status and headers
+if (result.ok) {
+  // TODO: Use 'result.value' of type ProductSearch
+} else {
+  // TODO: Handle 'result', discriminated with 'result.payload.kind'
+}
+```
+
+</dd>
+</dl>
+
+### Parameters
+
+<dl>
+<dd>
+
+| Name | Type | Description |
+| --- | --- | --- |
+| <code>q</code> | <code>string</code> | What to look for, 2 to 120 characters. |
+| <code>limit?</code> | <code>number</code> | Most products to return from the agent's stores.<br>**Default**: 8 |
+
+</dd>
+</dl>
+
+### Response
+
+<dl>
+<dd>
+
+**Direct**: `await client.products.findProducts(request)`
+
+- **OnSuccess**: <code>[ProductSearch](src/models/product-search.ts)</code>
+- **OnError**: throws <code>[Products.FindProductsError](src/resources/products.ts)</code>, with `err.payload` discriminated on `kind`
+
+**As ApiResult**: `await client.products.findProducts(request).asApiResult()`
+
+- **OnSuccess**: <code>[ApiResult](src/core/api-promise.ts)&lt;ProductSearch, Products.FindProductsError&gt;</code>, with `result.value` of type <code>[ProductSearch](src/models/product-search.ts)</code>
+- **OnError**: `result.payload` discriminated on `kind`, with `result.message`
+
+**Thrown**: <code>[CosignAgentApiError](src/core/errors.ts)</code> on any operational failure — a caller abort and a programmer error stay outside the family and reach you raw
+
+</dd>
+</dl>
+
+</dd>
+</dl>
+
+</details>
+
 ## SpendRequests
 
 > Source: [SpendRequests](src/resources/spend-requests.ts)
