@@ -140,6 +140,36 @@ export const stores = pgTable("stores", {
   createdAt: createdAt(),
 });
 
+// --------------------------------------------------------------- addresses
+
+// Where an owner's orders ship. Agents only ever see the label, never the
+// address. US only for now (the sandbox stores are US merchants). PO boxes are fine.
+export const addresses = pgTable(
+  "addresses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: text("owner_id").notNull().references(() => users.id),
+    label: text("label").notNull(),
+    recipient: text("recipient").notNull(),
+    line1: text("line1").notNull(),
+    line2: text("line2"),
+    city: text("city").notNull(),
+    // Two-letter state code.
+    region: text("region").notNull(),
+    postalCode: text("postal_code").notNull(),
+    countryCode: text("country_code").notNull().default("US"),
+    createdAt: createdAt(),
+    archivedAt: ts("archived_at"),
+  },
+  (t) => [
+    index("addresses_owner_idx").on(t.ownerId),
+    unique("addresses_id_owner").on(t.id, t.ownerId),
+    check("addresses_country_us", sql`${t.countryCode} = 'US'`),
+    check("addresses_region_code", sql`${t.region} ~ '^[A-Z]{2}$'`),
+    check("addresses_postal_code", sql`${t.postalCode} ~ '^[0-9]{5}(-[0-9]{4})?$'`),
+  ],
+);
+
 // ------------------------------------------------------------------- slips
 
 export const slips = pgTable(
@@ -161,6 +191,8 @@ export const slips = pgTable(
     currentPeriodIndex: integer("current_period_index").notNull().default(0),
     currentPeriodStartsAt: ts("current_period_starts_at").notNull(),
     currentPeriodEndsAt: ts("current_period_ends_at").notNull(),
+    // Where this agent's purchases ship (owner's choice; the agent sees only the label).
+    shipToAddressId: uuid("ship_to_address_id"),
     createdAt: createdAt(),
     endedAt: ts("ended_at"),
   },
@@ -168,6 +200,8 @@ export const slips = pgTable(
     index("slips_owner_idx").on(t.ownerId),
     unique("slips_id_owner").on(t.id, t.ownerId),
     foreignKey({ name: "slips_agent_owner_fk", columns: [t.agentId, t.ownerId], foreignColumns: [agents.id, agents.ownerId] }),
+    // Only one of the owner's own addresses.
+    foreignKey({ name: "slips_ship_to_owner_fk", columns: [t.shipToAddressId, t.ownerId], foreignColumns: [addresses.id, addresses.ownerId] }),
     // At most one live slip per agent.
     uniqueIndex("slips_one_live_per_agent")
       .on(t.agentId)
@@ -346,6 +380,45 @@ export const idempotencyKeys = pgTable(
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.ownerId, t.key] })],
+);
+
+// ------------------------------------------------------------------ orders
+
+export const orderStatus = pgEnum("order_status", ["SENT", "SEEN", "SHIPPED", "CANCELLED"]);
+
+// What the store must ship for a paid purchase. Created when the payment
+// completes. ship_to is a copy of the address at that moment (null when the
+// slip has none). Stores open it with a private link signed by Cosign.
+// SEEN means the store confirmed it (a button, so link previews don't count).
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: text("owner_id").notNull().references(() => users.id),
+    agentId: uuid("agent_id").notNull(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id),
+    spendRequestId: uuid("spend_request_id").notNull().unique(),
+    items: jsonb("items").notNull(),
+    totalCents: cents("total_cents").notNull(),
+    shipTo: jsonb("ship_to"),
+    status: orderStatus("status").notNull().default("SENT"),
+    // PayPal accepted the capture as PENDING: the store must not ship until
+    // PayPal confirms it (PAYMENT.CAPTURE.COMPLETED clears this).
+    paymentPending: boolean("payment_pending").notNull().default(false),
+    createdAt: createdAt(),
+    seenAt: ts("seen_at"),
+    shippedAt: ts("shipped_at"),
+    cancelledAt: ts("cancelled_at"),
+  },
+  (t) => [
+    index("orders_owner_idx").on(t.ownerId, t.createdAt),
+    index("orders_store_idx").on(t.storeId, t.createdAt),
+    foreignKey({ name: "orders_spend_owner_fk", columns: [t.spendRequestId, t.ownerId], foreignColumns: [spendRequests.id, spendRequests.ownerId] }),
+    foreignKey({ name: "orders_agent_owner_fk", columns: [t.agentId, t.ownerId], foreignColumns: [agents.id, agents.ownerId] }),
+    check("orders_total_positive", sql`${t.totalCents} > 0`),
+  ],
 );
 
 // ---------------------------------------------------------- PayPal webhooks

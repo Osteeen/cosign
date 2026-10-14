@@ -63,6 +63,14 @@ public record Slip
     public required DateTimeOffset? ExpiresAt { get; init; }
 
     /// <summary>
+    /// The label of the owner's address that this agent's orders ship to,
+    /// e.g. "Office". The agent never sees or chooses the address itself:
+    /// the store gets it with each paid order. Null when nothing ships.
+    /// </summary>
+    [JsonPropertyName("ships_to")]
+    public required string? ShipsTo { get; init; }
+
+    /// <summary>
     /// Only stores with an approved budget hold for this period.
     /// </summary>
     [JsonPropertyName("stores")]

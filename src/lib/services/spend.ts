@@ -27,6 +27,7 @@ import type { Category, FinalDecision, IntentResult, SpendRequestInput } from "@
 import { formatUsd } from "@/lib/money";
 import { logActivity, notFound, ServiceError, sha256, type Tx } from "./common";
 import { notifyApprovalNeeded } from "./notify";
+import { cancelOrderForPurchase, confirmOrderPayment, createOrderForPaidPurchase } from "./orders";
 import { CATEGORIES, rollOverAgentIfDue } from "./slips";
 
 const APPROVAL_TTL_MS = 24 * 60 * 60 * 1000;
@@ -305,7 +306,7 @@ async function capture(row: SpendRow): Promise<SpendRow> {
   for (let attempt = 0; ; attempt++) {
     try {
       const result = await captureFromHold({ authorizationId, amountCents: row.totalCents, spendRequestId: row.id });
-      if (result.status === "COMPLETED" || result.status === "PENDING") return settle(row, result.captureId, null);
+      if (result.status === "COMPLETED" || result.status === "PENDING") return settle(row, result.captureId, null, result.status === "PENDING");
       return settle(row, null, `capture_${result.status.toLowerCase()}`);
     } catch (e) {
       if (e instanceof PayPalError && e.definite) return settle(row, null, e.issue ?? `http_${e.status}`);
@@ -335,7 +336,7 @@ export async function resumeIfStuck(row: SpendRow): Promise<SpendRow> {
   return capture(row);
 }
 
-async function settle(row: SpendRow, captureId: string | null, failure: string | null): Promise<SpendRow> {
+async function settle(row: SpendRow, captureId: string | null, failure: string | null, paymentPending = false): Promise<SpendRow> {
   return db.transaction(async (tx) => {
     const [current] = await tx.select().from(spendRequests).where(eq(spendRequests.id, row.id)).for("update");
     if (!current || current.status !== "PROCESSING") return current ?? row;
@@ -352,6 +353,8 @@ async function settle(row: SpendRow, captureId: string | null, failure: string |
       .set(captureId ? { status: "COMPLETED", paypalCaptureId: captureId, paidAt: new Date() } : { status: "PAYMENT_FAILED" })
       .where(eq(spendRequests.id, row.id))
       .returning();
+    // Paid: hand the order to the store.
+    if (captureId) await createOrderForPaidPurchase(tx, updated!, { paymentPending });
     await logActivity(tx, {
       ownerId: row.ownerId,
       agentId: row.agentId,
@@ -387,6 +390,19 @@ async function needsReview(row: SpendRow, summary: string, data: Record<string, 
   });
 }
 
+// The store shipped, but the payment did not stand: the owner must sort it
+// out with the store. Logged under Problems; nothing changes automatically.
+async function orderShippedButUnpaid(tx: Tx, row: SpendRow) {
+  await logActivity(tx, {
+    ownerId: row.ownerId,
+    agentId: row.agentId,
+    spendRequestId: row.id,
+    type: "PAYMENT_NEEDS_REVIEW",
+    amountCents: row.totalCents,
+    summary: `The store had already shipped this order when PayPal took back ${formatUsd(row.totalCents)}; check it with the store`,
+  });
+}
+
 // PAYMENT.CAPTURE.COMPLETED: settles a request still waiting for PayPal's
 // answer (timeout, server stopped) - the money moved, so it is paid. The
 // capture must be for this request's amount, from the authorization it was
@@ -401,7 +417,8 @@ export async function captureConfirmedByPayPal(spendId: unknown, captureId: stri
     if (authorizationId !== hold?.a && authorizationId !== hold?.c) return "not_ours";
   }
   if (row.status === "COMPLETED") {
-    if (row.paypalCaptureId === captureId) return "already_paid";
+    // A capture that was PENDING is now complete: the store may ship.
+    if (row.paypalCaptureId === captureId) return (await confirmOrderPayment(row.id)) ? "payment_confirmed" : "already_paid";
     await needsReview(row, `PayPal reports a second payment for this purchase (${amountCents === null ? "amount unknown" : formatUsd(amountCents)}); check it with the store`, { captureId });
     return "flagged_second_capture";
   }
@@ -435,15 +452,17 @@ export async function captureFailedAtPayPal(spendId: unknown, captureId: string)
     if (current?.status !== "COMPLETED") return "already_reversed";
     await tx.update(holds).set({ capturedCents: sql`${holds.capturedCents} - ${row.totalCents}` }).where(eq(holds.id, row.holdId!));
     await tx.update(spendRequests).set({ status: "PAYMENT_FAILED" }).where(eq(spendRequests.id, row.id));
+    const order = await cancelOrderForPurchase(tx, row.id);
     await logActivity(tx, {
       ownerId: row.ownerId,
       agentId: row.agentId,
       spendRequestId: row.id,
       type: "PAYMENT_REVERSED",
       amountCents: row.totalCents,
-      summary: `PayPal did not complete ${formatUsd(row.totalCents)}; nothing was charged`,
+      summary: `PayPal did not complete ${formatUsd(row.totalCents)}; nothing was charged${order === "cancelled" ? " and the store's order was cancelled" : ""}`,
     });
-    return "reversed";
+    if (order === "shipped") await orderShippedButUnpaid(tx, row);
+    return order === "shipped" ? "reversed_flagged" : "reversed";
   });
 }
 
@@ -453,6 +472,19 @@ export async function captureFailedAtPayPal(spendId: unknown, captureId: string)
 export async function captureRefundedAtPayPal(captureId: string, amountCents: number | null, reversed: boolean): Promise<WebhookOutcome> {
   const [row] = await db.select().from(spendRequests).where(eq(spendRequests.paypalCaptureId, captureId));
   if (!row) return "not_ours";
+  // All the money went back (or PayPal took it back): the store won't ship.
+  // A partial refund (say, a damaged item) leaves the order as it is.
+  if (reversed || amountCents === row.totalCents) {
+    const order = await db.transaction(async (tx) => {
+      await tx.select({ id: spendRequests.id }).from(spendRequests).where(eq(spendRequests.id, row.id)).for("update");
+      const result = await cancelOrderForPurchase(tx, row.id);
+      if (result === "shipped" && reversed) await orderShippedButUnpaid(tx, row);
+      return result;
+    });
+    if (order === "cancelled") {
+      await logActivity(db, { ownerId: row.ownerId, agentId: row.agentId, spendRequestId: row.id, type: "ORDER_CANCELLED", summary: "The store's order was cancelled because the payment was refunded" });
+    }
+  }
   await logActivity(db, {
     ownerId: row.ownerId,
     agentId: row.agentId,
@@ -567,7 +599,13 @@ export async function listSpendRequestsForOwner(ownerId: string, agentId: string
 }
 
 // Public shape for the agent API: no PayPal IDs, no owner data.
-export function toApi(row: SpendRow) {
+// The order behind a paid purchase, as the agent may see it: status and the
+// address label only, never the address itself.
+type OrderSummary = { status: string; shipTo: unknown };
+const orderForAgent = (order: OrderSummary | null | undefined) =>
+  order ? { status: order.status, ships_to: (order.shipTo as { label?: string } | null)?.label ?? null } : null;
+
+export function toApi(row: SpendRow, order?: OrderSummary | null) {
   const decision = row.decision as { outcome: string; reasons: unknown[]; rule_version: number | null; intent_check: unknown };
   return {
     id: row.id,
@@ -581,6 +619,7 @@ export function toApi(row: SpendRow) {
     cart_hash: row.cartHash,
     approval_expires_at: row.approvalExpiresAt?.toISOString() ?? null,
     receipt: row.status === "COMPLETED" ? { receipt_id: `rcpt_${row.id.slice(0, 8)}`, paid: { amount_cents: row.totalCents, currency: row.currency }, paid_at: row.paidAt?.toISOString() } : null,
+    order: orderForAgent(order),
     created_at: row.createdAt.toISOString(),
   };
 }

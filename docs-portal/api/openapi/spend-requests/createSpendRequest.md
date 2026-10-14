@@ -132,6 +132,7 @@ paths:
                     cart_hash: 8a2d4f6b0c1e3a5c7e9b1d3f5a7c9e1b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c
                     approval_expires_at: 2026-10-11T09:20:00.000Z
                     receipt: null
+                    order: null
                     created_at: 2026-10-10T09:20:00.000Z
                 blocked:
                   summary: Blocked by the rules
@@ -162,6 +163,7 @@ paths:
                     cart_hash: c4e6a8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c6
                     approval_expires_at: null
                     receipt: null
+                    order: null
                     created_at: 2026-10-10T09:25:00.000Z
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -340,6 +342,7 @@ components:
         - cart_hash
         - approval_expires_at
         - receipt
+        - order
         - created_at
       properties:
         id:
@@ -388,6 +391,12 @@ components:
           description: Filled in when the request is COMPLETED.
           oneOf:
             - $ref: "#/components/schemas/Receipt"
+            - type: "null"
+        order:
+          description: The order handed to the store once the request is paid; null before
+            that.
+          oneOf:
+            - $ref: "#/components/schemas/OrderSummary"
             - type: "null"
         created_at:
           type: string
@@ -544,6 +553,36 @@ components:
           format: date-time
           description: When PayPal paid the store.
           example: 2026-10-10T09:15:02.000Z
+    OrderSummary:
+      type: object
+      description: |
+        What the agent may know about the order a paid purchase created. The
+        store gets the items and the owner's address; the agent only sees the
+        address label and whether the store has seen or shipped it.
+      required:
+        - status
+        - ships_to
+      properties:
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        ships_to:
+          type:
+            - string
+            - "null"
+          description: The label of the owner's address it ships to, or null when nothing
+            ships.
+          example: Office
+    OrderStatus:
+      type: string
+      description: "`SENT` to the store, `SEEN` (the store confirmed it), `SHIPPED`,
+        or `CANCELLED` (PayPal did not complete the payment, or it was fully
+        refunded)."
+      enum:
+        - SENT
+        - SEEN
+        - SHIPPED
+        - CANCELLED
+      example: SENT
     DecisionOutcome:
       type: string
       description: What the rules (and the AI check) decided.
@@ -668,6 +707,9 @@ components:
             amount_cents: 1298
             currency: USD
           paid_at: 2026-10-10T09:15:02.000Z
+        order:
+          status: SENT
+          ships_to: Office
         created_at: 2026-10-10T09:15:01.000Z
   responses:
     BadRequest:

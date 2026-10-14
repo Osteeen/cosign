@@ -15,7 +15,15 @@ export function ShopFrame({ store, children }: { store: DemoStore; children: Rea
             </span>
             {store.name}
           </Link>
-          <span className="shop-paypal">Accepts PayPal</span>
+          <span className="shop-header-links">
+            <Link href={`${storePath(store)}/orders`} className="shop-orders-link" aria-label="Orders received">
+              <span className="shop-orders-long">Orders received</span>
+              <span className="shop-orders-short" aria-hidden="true">
+                Orders
+              </span>
+            </Link>
+            <span className="shop-paypal">Accepts PayPal</span>
+          </span>
         </div>
       </header>
       <p className="shop-banner">

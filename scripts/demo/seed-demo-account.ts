@@ -14,7 +14,8 @@ import { agents, holds, slips, stores, users } from "@/db/schema";
 import { DEMO_OWNER_EMAIL, DEMO_OWNER_ID } from "@/lib/demo/account";
 import { createAgent } from "@/lib/services/agents";
 import { appUrl } from "@/lib/services/common";
-import { createSlip, reopenFailedHolds } from "@/lib/services/slips";
+import { createSlip, reopenFailedHolds, setSlipShipTo } from "@/lib/services/slips";
+import { createAddress, listAddresses } from "@/lib/services/addresses";
 
 // Opening the holds calls PayPal, and PayPal sends the buyer back to APP_URL:
 // refuse to start without both, rather than leave holds that failed.
@@ -44,7 +45,22 @@ if (!mine.some((a) => a.name === SECOND)) {
   console.log(`Added agent "${SECOND}" (no slip)`);
 }
 
-const [live] = await db.select({ id: slips.id }).from(slips).where(and(eq(slips.agentId, bot.id), inArray(slips.status, ["AWAITING_HOLDS", "ACTIVE"])));
+// A made-up sample address everyone using the demo shares (orders show it to the store).
+let [demoAddress] = await listAddresses(DEMO_OWNER_ID);
+if (!demoAddress) {
+  demoAddress = await createAddress(DEMO_OWNER_ID, {
+    label: "Demo office",
+    recipient: "Cosign Demo Team",
+    line1: "100 Sample Street",
+    line2: "Suite 200",
+    city: "San Francisco",
+    region: "CA",
+    postal_code: "94105",
+  });
+  console.log('Added the sample address "Demo office"');
+}
+
+const [live] = await db.select({ id: slips.id, shipTo: slips.shipToAddressId }).from(slips).where(and(eq(slips.agentId, bot.id), inArray(slips.status, ["AWAITING_HOLDS", "ACTIVE"])));
 let slipId = live?.id;
 if (!slipId) {
   const demoStores = await db.select().from(stores).where(inArray(stores.name, ["Paper Co", "Bean Supply"]));
@@ -59,10 +75,15 @@ if (!slipId) {
     expiresAt: null,
     sourceText: WORDS,
     allocations: null,
+    shipToAddressId: demoAddress.id,
   });
   slipId = slip.id;
   console.log("Co-signed the demo slip.");
 } else {
+  if (!live.shipTo) {
+    await setSlipShipTo(DEMO_OWNER_ID, slipId, demoAddress.id);
+    console.log('The demo slip now ships to "Demo office" (new orders; holds already at PayPal are unchanged).');
+  }
   const [failed] = await db.select({ id: holds.id }).from(holds).where(and(eq(holds.slipId, slipId), eq(holds.status, "FAILED")));
   if (failed) console.log(`Opened ${await reopenFailedHolds(DEMO_OWNER_ID, slipId)} failed budget hold(s) at PayPal again.`);
 }

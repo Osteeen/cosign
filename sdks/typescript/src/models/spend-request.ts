@@ -3,6 +3,7 @@ import type { Schema } from "../core/validation/schema.js";
 import { decisionSchema, type Decision } from "./decision.js";
 import { lineItemSchema, type LineItem } from "./line-item.js";
 import { moneySchema, type Money } from "./money.js";
+import { orderSummarySchema, type OrderSummary } from "./order-summary.js";
 import { receiptSchema, type Receipt } from "./receipt.js";
 import { spendRequestStatusSchema, type SpendRequestStatus } from "./spend-request-status.js";
 
@@ -39,6 +40,8 @@ export type SpendRequest = {
   approvalExpiresAt: Date | null;
   /** Filled in when the request is COMPLETED. */
   receipt: Receipt | null;
+  /** The order handed to the store once the request is paid; null before that. */
+  order: OrderSummary | null;
   /** When the agent asked. */
   createdAt: Date;
 };
@@ -55,6 +58,7 @@ export const spendRequestSchema: Schema<SpendRequest> = s.object<SpendRequest>({
   cartHash: s.string(),
   approvalExpiresAt: s.nullable(s.dateTime()),
   receipt: s.nullable(s.lazy(() => receiptSchema)),
+  order: s.nullable(s.lazy(() => orderSummarySchema)),
   createdAt: s.dateTime(),
   _keysMap: {
     agentId: "agent_id",

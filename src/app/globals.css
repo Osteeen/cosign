@@ -1282,6 +1282,29 @@ a {
   color: var(--ink);
 }
 
+/* Radio variant: a round box with an inked dot instead of a tick. */
+.check input[type="radio"] {
+  border-radius: 50%;
+}
+
+.check input[type="radio"]::after {
+  width: 8px;
+  height: 8px;
+  margin-top: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--on-ballpoint);
+  transform: scale(0);
+}
+
+.check input[type="radio"]:checked::after {
+  transform: scale(1);
+}
+
+.check-grid.check-grid-wide {
+  grid-template-columns: 1fr;
+}
+
 .check span {
   color: var(--ink-soft);
   transition: color 120ms ease;
@@ -2733,5 +2756,157 @@ button.chip {
 @media (prefers-reduced-motion: reduce) {
   .nav-progress {
     transition: opacity 200ms ease;
+  }
+}
+
+/* Address book */
+.form-grid-3 {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.field-input-short {
+  max-width: 6em;
+}
+
+.address-lines {
+  line-height: 1.5;
+}
+
+.inline-edit {
+  display: contents;
+}
+
+.inline-edit[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.inline-edit > summary {
+  list-style: none;
+  align-self: flex-start;
+}
+
+.inline-edit > summary::-webkit-details-marker {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .form-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Store's order page */
+.store-order-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.order-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.order-items .order-total {
+  border-bottom: 0;
+  font-weight: 700;
+}
+
+/* Demo store: orders received (store view) */
+.shop-header-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.shop-orders-link {
+  color: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.shop-note {
+  margin: 0 0 18px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.shop-orders {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.shop-order {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  padding: 14px 18px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--sheet);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 140ms ease;
+}
+
+.shop-order:hover {
+  border-color: var(--ink-soft);
+}
+
+.shop-order-what {
+  font-weight: 600;
+}
+
+.shop-order-meta {
+  grid-column: 1;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.shop-order .shop-card-price {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.shop-logo {
+  white-space: nowrap;
+}
+
+.shop-orders-short {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .shop-orders-long {
+    display: none;
+  }
+
+  .shop-orders-short {
+    display: inline;
+  }
+
+  .shop-header-links {
+    gap: 10px;
   }
 }

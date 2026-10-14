@@ -8,6 +8,7 @@ import { getAgent } from "@/lib/services/agents";
 import { ServiceError } from "@/lib/services/common";
 import { getLiveSlip } from "@/lib/services/slips";
 import { listStores } from "@/lib/services/stores";
+import { addressSummary, listAddresses } from "@/lib/services/addresses";
 
 export default async function NewSlipPage({ params }: { params: Promise<{ agentId: string }> }) {
   const owner = await requireOwner();
@@ -18,7 +19,7 @@ export default async function NewSlipPage({ params }: { params: Promise<{ agentI
     throw e;
   });
   if (agent.status === "REVOKED" || (await getLiveSlip(owner.id, agentId))) redirect(`/agents/${agentId}`);
-  const stores = await listStores();
+  const [stores, addresses] = await Promise.all([listStores(), listAddresses(owner.id)]);
 
   return (
     <>
@@ -30,7 +31,12 @@ export default async function NewSlipPage({ params }: { params: Promise<{ agentI
           </Link>
           <h1 className="panel-title">Permission slip for {agent.name}</h1>
           <p className="panel-text">Set what it may spend and where. You co-sign it, then approve a PayPal budget hold for each store.</p>
-          <SlipForm agentId={agentId} agentName={agent.name} stores={stores.map((s) => ({ id: s.id, name: s.name }))} />
+          <SlipForm
+            agentId={agentId}
+            agentName={agent.name}
+            stores={stores.map((s) => ({ id: s.id, name: s.name }))}
+            addresses={addresses.map((a) => ({ id: a.id, label: a.label, summary: addressSummary(a) }))}
+          />
         </div>
       </main>
     </>

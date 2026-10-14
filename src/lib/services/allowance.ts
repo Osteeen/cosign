@@ -4,7 +4,7 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { holds, slips, stores } from "@/db/schema";
+import { addresses, holds, slips, stores } from "@/db/schema";
 import { appUrl } from "./common";
 import { rollOverAgentIfDue } from "./slips";
 
@@ -27,6 +27,10 @@ export async function getAllowance(agent: { id: string; status: string }) {
     .innerJoin(stores, eq(stores.id, holds.storeId))
     .where(and(eq(holds.slipId, slip.id), eq(holds.periodIndex, slip.currentPeriodIndex)));
   const committed = periodHolds.reduce((s, h) => s + h.hold.capturedCents + h.hold.reservedCents, 0);
+  // The agent learns only which of the owner's addresses orders ship to, by label.
+  const [shipTo] = slip.shipToAddressId
+    ? await db.select({ label: addresses.label }).from(addresses).where(and(eq(addresses.id, slip.shipToAddressId), eq(addresses.ownerId, slip.ownerId)))
+    : [];
 
   return {
     agent_id: agent.id,
@@ -40,6 +44,7 @@ export async function getAllowance(agent: { id: string; status: string }) {
       approve_above: usd(slip.approveAboveCents),
       categories: slip.categories,
       expires_at: slip.expiresAt?.toISOString() ?? null,
+      ships_to: shipTo?.label ?? null,
       stores: periodHolds
         .filter((h) => h.hold.status === "ACTIVE")
         .map((h) => ({

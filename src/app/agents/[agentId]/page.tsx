@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
-import { endSlipAction, pauseAgentAction, renewSlipAction, revokeAgentAction } from "@/app/actions";
+import { endSlipAction, pauseAgentAction, renewSlipAction, revokeAgentAction, setShipToAction } from "@/app/actions";
 import { ActivityList } from "@/components/activity-list";
 import { ApprovalCard } from "@/components/approval-card";
 import { cardMarket } from "@/lib/services/market";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { SubmitButton } from "@/components/submit-button";
+import { isDemoOwner } from "@/lib/demo/account";
+import { addressSummary, getAddressForSlip, listAddresses } from "@/lib/services/addresses";
+import { orderLink, ordersForPurchases } from "@/lib/services/orders";
 import { Notice } from "@/components/notice";
 import { Slip } from "@/components/slip";
 import { Topbar } from "@/components/topbar";
@@ -37,6 +41,13 @@ const CATEGORY_LABELS: Record<string, string> = {
   household: "Household",
   other: "Other",
 };
+const ORDER_LABEL: Record<string, string> = {
+  SENT: "sent to the store",
+  SEEN: "confirmed by the store",
+  SHIPPED: "shipped",
+  CANCELLED: "cancelled - PayPal did not complete the payment",
+};
+
 const SPEND_STAMP: Record<string, { cls: string; label: string }> = {
   COMPLETED: { cls: "allow", label: "Paid" },
   PROCESSING: { cls: "ask", label: "Paying" },
@@ -66,12 +77,16 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
   // A period that just ended moves to its renewed holds (or the slip expires).
   await rollOverAgentIfDue(agentId);
   const slip = await getLiveSlip(owner.id, agentId);
-  const [slipHolds, spends, pending, activity] = await Promise.all([
+  const [slipHolds, spends, pending, activity, addresses] = await Promise.all([
     slip ? listSlipHolds(owner.id, slip.id) : Promise.resolve([]),
     listSpendRequestsForOwner(owner.id, agentId),
     listPendingApprovals(owner.id),
     recentActivity(owner.id, agentId, 10),
+    listAddresses(owner.id),
   ]);
+  const orders = await ordersForPurchases(owner.id, spends.map((s) => s.spend.id));
+  const shipTo = slip?.shipToAddressId ? await getAddressForSlip(owner.id, slip.shipToAddressId) : null;
+  const demo = isDemoOwner(owner.id);
   const myPending = pending.filter((p) => p.spend.agentId === agentId);
   const period = slip ? slipHolds.filter((h) => h.periodIndex === slip.currentPeriodIndex) : [];
   const spent = period.reduce((s, h) => s + h.capturedCents, 0);
@@ -208,10 +223,45 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                       { label: "Ask me above", value: formatUsd(slip.approveAboveCents) },
                       { label: "Categories", value: slip.categories.map((c) => CATEGORY_LABELS[c] ?? c).join(", ") },
                       { label: "Ends", value: slip.expiresAt ? dateFmt.format(slip.expiresAt) : "When you end it" },
+                      {
+                        label: "Ships to",
+                        value: shipTo ? `${shipTo.label} - ${shipTo.recipient}, ${addressSummary(shipTo)}` : "No address - nothing to ship",
+                      },
                     ]}
                     signedBy={signatureName(owner.name, owner.email)}
                     signedOn={dateFmt.format(slip.createdAt)}
                   />
+                  {!demo ? (
+                    <details className="inline-edit">
+                      <summary className="button button-quiet">Change where orders ship</summary>
+                      <form action={setShipToAction} className="slip panel-stack">
+                        <input type="hidden" name="slipId" value={slip.id} />
+                        <input type="hidden" name="agentId" value={agentId} />
+                        <fieldset className="fieldset">
+                          <legend className="field-label">Ship orders to</legend>
+                          <div className="check-grid check-grid-wide">
+                            {addresses.map((a) => (
+                              <label className="check" key={a.id}>
+                                <input type="radio" name="addressId" value={a.id} defaultChecked={a.id === slip.shipToAddressId} />
+                                <span>
+                                  {a.label} <span className="muted">- {addressSummary(a)}</span>
+                                </span>
+                              </label>
+                            ))}
+                            <label className="check">
+                              <input type="radio" name="addressId" value="" defaultChecked={!slip.shipToAddressId} />
+                              <span>No address - nothing to ship</span>
+                            </label>
+                          </div>
+                        </fieldset>
+                        <p className="field-help">
+                          New orders ship to it. Budget holds already at PayPal keep the address they were opened with.{" "}
+                          <Link href={`/addresses?back=/agents/${agentId}`}>Add or edit addresses</Link>
+                        </p>
+                        <SubmitButton pendingLabel="Saving">Save</SubmitButton>
+                      </form>
+                    </details>
+                  ) : null}
                   <ConfirmDialog
                     trigger="End slip"
                     triggerClassName="button button-quiet button-quiet-danger"
@@ -290,6 +340,19 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                             {storeName}
                             {reasons.length && spend.status !== "COMPLETED" ? ` - ${reasons.map((r) => r.message).join(" ")}` : ""}
                           </span>
+                          {orders.get(spend.id) ? (
+                            <span className="decision-why">
+                              Order: {orders.get(spend.id)!.paymentPending && orders.get(spend.id)!.status !== "CANCELLED" ? "waiting for PayPal to confirm the payment" : ORDER_LABEL[orders.get(spend.id)!.status]}
+                              {orders.get(spend.id)!.status !== "CANCELLED" ? (
+                                <>
+                                  {" - "}
+                                  <a href={orderLink(orders.get(spend.id)!.id)} target="_blank" rel="noreferrer">
+                                    store&apos;s order page
+                                  </a>
+                                </>
+                              ) : null}
+                            </span>
+                          ) : null}
                         </span>
                         <span className="decision-amount">{formatUsd(spend.totalCents)}</span>
                       </li>

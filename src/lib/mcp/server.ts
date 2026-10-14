@@ -13,6 +13,7 @@ import { z } from "zod";
 import { formatUsd } from "@/lib/money";
 import { getAllowance } from "@/lib/services/allowance";
 import { findProducts } from "@/lib/services/products";
+import { ordersForPurchases } from "@/lib/services/orders";
 import { ServiceError } from "@/lib/services/common";
 import { CATEGORIES } from "@/lib/services/slips";
 import { createSpendRequest, getSpendRequestForAgent, listSpendRequestsForAgent, toApi } from "@/lib/services/spend";
@@ -36,7 +37,7 @@ function describe(row: ReturnType<typeof toApi>): string {
   const reasons = (row.decision.reasons as { message: string }[]).map((r) => r.message).join(" ");
   switch (row.status) {
     case "COMPLETED":
-      return `Paid ${amount}. PayPal paid the merchant from the owner's budget hold. Receipt ${row.receipt?.receipt_id}.`;
+      return `Paid ${amount}. PayPal paid the merchant from the owner's budget hold. Receipt ${row.receipt?.receipt_id}.${row.order ? ` The order went to the store${row.order.ships_to ? ` and ships to the owner's "${row.order.ships_to}" address` : ""} (status ${row.order.status}).` : ""}`;
     case "PENDING_APPROVAL":
       return `Waiting for the owner's approval (${reasons}) The owner has been emailed. Check again with cosign_get_purchase using id ${row.id}; nothing is charged unless they approve.`;
     case "DENIED":
@@ -71,7 +72,7 @@ export function buildCosignMcpServer(agent: Agent): McpServer {
         const s = allowance.slip;
         const stores = s.stores.map((x) => `${x.store.name} (id ${x.store.id}, ${formatUsd(x.remaining_in_hold.amount_cents)} left)`).join("; ");
         return ok(
-          `${formatUsd(s.remaining_this_period.amount_cents)} left until ${s.period_ends_at.slice(0, 10)}. Up to ${formatUsd(s.per_purchase_max.amount_cents)} per purchase; the owner approves anything over ${formatUsd(s.approve_above.amount_cents)}. Categories: ${s.categories.join(", ")}. Merchants: ${stores || "none with an active budget hold"}.`,
+          `${formatUsd(s.remaining_this_period.amount_cents)} left until ${s.period_ends_at.slice(0, 10)}. Up to ${formatUsd(s.per_purchase_max.amount_cents)} per purchase; the owner approves anything over ${formatUsd(s.approve_above.amount_cents)}. Categories: ${s.categories.join(", ")}. Merchants: ${stores || "none with an active budget hold"}. ${s.ships_to ? `Orders ship to the owner's "${s.ships_to}" address; you never need to give an address.` : "No shipping address is set, so nothing will be shipped."}`,
           allowance,
         );
       } catch (e) {
@@ -152,7 +153,7 @@ export function buildCosignMcpServer(agent: Agent): McpServer {
           total: { amount_cents: total, currency: "USD" },
           purpose: args.purpose,
         });
-        const out = toApi(row);
+        const out = toApi(row, (await ordersForPurchases(row.ownerId, [row.id])).get(row.id));
         return ok(describe(out), out);
       } catch (e) {
         return fail(e);
@@ -170,7 +171,8 @@ export function buildCosignMcpServer(agent: Agent): McpServer {
     },
     async ({ purchase_id }) => {
       try {
-        const out = toApi(await getSpendRequestForAgent(agent.id, purchase_id));
+        const row = await getSpendRequestForAgent(agent.id, purchase_id);
+        const out = toApi(row, (await ordersForPurchases(row.ownerId, [row.id])).get(row.id));
         return ok(describe(out), out);
       } catch (e) {
         return fail(e);
@@ -188,7 +190,9 @@ export function buildCosignMcpServer(agent: Agent): McpServer {
     },
     async ({ limit }) => {
       try {
-        const rows = (await listSpendRequestsForAgent(agent.id, limit)).map(toApi);
+        const raw = await listSpendRequestsForAgent(agent.id, limit);
+        const orders = await ordersForPurchases(raw[0]?.ownerId ?? "", raw.map((r) => r.id));
+        const rows = raw.map((r) => toApi(r, orders.get(r.id)));
         const lines = rows.map((r) => `${r.created_at.slice(0, 10)} ${formatUsd(r.total.amount_cents)} ${r.status}`).join("\n");
         return ok(rows.length ? lines : "No purchases yet.", { purchases: rows });
       } catch (e) {

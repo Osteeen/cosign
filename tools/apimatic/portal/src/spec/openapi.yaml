@@ -160,6 +160,7 @@ paths:
                   approve_above: { amount_cents: 5000, currency: USD }
                   categories: [office_supplies, groceries]
                   expires_at: null
+                  ships_to: Office
                   stores:
                     - store:
                         id: 7d1c2b3a-4e5f-4a6b-9c7d-8e9f0a1b2c3d
@@ -336,6 +337,7 @@ paths:
                     cart_hash: 8a2d4f6b0c1e3a5c7e9b1d3f5a7c9e1b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c
                     approval_expires_at: "2026-10-11T09:20:00.000Z"
                     receipt: null
+                    order: null
                     created_at: "2026-10-10T09:20:00.000Z"
                 blocked:
                   summary: Blocked by the rules
@@ -358,6 +360,7 @@ paths:
                     cart_hash: c4e6a8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c6
                     approval_expires_at: null
                     receipt: null
+                    order: null
                     created_at: "2026-10-10T09:25:00.000Z"
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -469,6 +472,7 @@ components:
           receipt_id: rcpt_91d68fb2
           paid: { amount_cents: 1298, currency: USD }
           paid_at: "2026-10-10T09:15:02.000Z"
+        order: { status: SENT, ships_to: Office }
         created_at: "2026-10-10T09:15:01.000Z"
 
   parameters:
@@ -702,7 +706,7 @@ components:
     Slip:
       type: object
       description: The agent's active permission slip, as the agent sees it.
-      required: [slip_id, period_days, period_ends_at, remaining_this_period, per_purchase_max, approve_above, categories, expires_at, stores]
+      required: [slip_id, period_days, period_ends_at, remaining_this_period, per_purchase_max, approve_above, categories, expires_at, ships_to, stores]
       properties:
         slip_id:
           type: string
@@ -737,6 +741,13 @@ components:
           format: date-time
           description: When the slip ends for good, or null if the owner set no end date.
           example: null
+        ships_to:
+          type: [string, "null"]
+          description: |
+            The label of the owner's address that this agent's orders ship to,
+            e.g. "Office". The agent never sees or chooses the address itself:
+            the store gets it with each paid order. Null when nothing ships.
+          example: Office
         stores:
           type: array
           description: Only stores with an approved budget hold for this period.
@@ -1063,6 +1074,27 @@ components:
         - `APPROVAL_EXPIRED` - the owner did not decide in time. Nothing was charged.
         - `PAYMENT_FAILED` - PayPal refused the capture. Nothing was charged.
 
+    OrderSummary:
+      type: object
+      description: |
+        What the agent may know about the order a paid purchase created. The
+        store gets the items and the owner's address; the agent only sees the
+        address label and whether the store has seen or shipped it.
+      required: [status, ships_to]
+      properties:
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        ships_to:
+          type: [string, "null"]
+          description: The label of the owner's address it ships to, or null when nothing ships.
+          example: Office
+
+    OrderStatus:
+      type: string
+      description: "`SENT` to the store, `SEEN` (the store confirmed it), `SHIPPED`, or `CANCELLED` (PayPal did not complete the payment, or it was fully refunded)."
+      enum: [SENT, SEEN, SHIPPED, CANCELLED]
+      example: SENT
+
     Receipt:
       type: object
       description: Proof of payment for a completed request.
@@ -1083,7 +1115,7 @@ components:
     SpendRequest:
       type: object
       description: A request to pay, and what Cosign decided.
-      required: [id, agent_id, store_id, items, total, purpose, status, decision, cart_hash, approval_expires_at, receipt, created_at]
+      required: [id, agent_id, store_id, items, total, purpose, status, decision, cart_hash, approval_expires_at, receipt, order, created_at]
       properties:
         id:
           type: string
@@ -1128,6 +1160,11 @@ components:
           description: Filled in when the request is COMPLETED.
           oneOf:
             - $ref: "#/components/schemas/Receipt"
+            - type: "null"
+        order:
+          description: The order handed to the store once the request is paid; null before that.
+          oneOf:
+            - $ref: "#/components/schemas/OrderSummary"
             - type: "null"
         created_at:
           type: string

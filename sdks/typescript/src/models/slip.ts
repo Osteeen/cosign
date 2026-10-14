@@ -24,6 +24,12 @@ export type Slip = {
   categories: Category[];
   /** When the slip ends for good, or null if the owner set no end date. */
   expiresAt: Date | null;
+  /**
+   * The label of the owner's address that this agent's orders ship to, e.g. "Office". The agent
+   * never sees or chooses the address itself: the store gets it with each paid order. Null when
+   * nothing ships.
+   */
+  shipsTo: string | null;
   /** Only stores with an approved budget hold for this period. */
   stores: StoreAllowance[];
 };
@@ -37,6 +43,7 @@ export const slipSchema: Schema<Slip> = s.object<Slip>({
   approveAbove: moneySchema,
   categories: s.array(s.lazy(() => categorySchema)),
   expiresAt: s.nullable(s.dateTime()),
+  shipsTo: s.nullable(s.string()),
   stores: s.array(s.lazy(() => storeAllowanceSchema)),
   _keysMap: {
     slipId: "slip_id",
@@ -46,5 +53,6 @@ export const slipSchema: Schema<Slip> = s.object<Slip>({
     perPurchaseMax: "per_purchase_max",
     approveAbove: "approve_above",
     expiresAt: "expires_at",
+    shipsTo: "ships_to",
   },
 });

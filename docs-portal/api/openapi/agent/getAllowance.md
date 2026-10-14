@@ -58,6 +58,7 @@ paths:
                     - office_supplies
                     - groceries
                   expires_at: null
+                  ships_to: Office
                   stores:
                     - store:
                         id: 7d1c2b3a-4e5f-4a6b-9c7d-8e9f0a1b2c3d
@@ -193,6 +194,7 @@ components:
         - approve_above
         - categories
         - expires_at
+        - ships_to
         - stores
       properties:
         slip_id:
@@ -233,6 +235,15 @@ components:
           format: date-time
           description: When the slip ends for good, or null if the owner set no end date.
           example: null
+        ships_to:
+          type:
+            - string
+            - "null"
+          description: |
+            The label of the owner's address that this agent's orders ship to,
+            e.g. "Office". The agent never sees or chooses the address itself:
+            the store gets it with each paid order. Null when nothing ships.
+          example: Office
         stores:
           type: array
           description: Only stores with an approved budget hold for this period.

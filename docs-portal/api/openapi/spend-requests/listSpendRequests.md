@@ -166,6 +166,7 @@ components:
         - cart_hash
         - approval_expires_at
         - receipt
+        - order
         - created_at
       properties:
         id:
@@ -214,6 +215,12 @@ components:
           description: Filled in when the request is COMPLETED.
           oneOf:
             - $ref: "#/components/schemas/Receipt"
+            - type: "null"
+        order:
+          description: The order handed to the store once the request is paid; null before
+            that.
+          oneOf:
+            - $ref: "#/components/schemas/OrderSummary"
             - type: "null"
         created_at:
           type: string
@@ -339,6 +346,36 @@ components:
           format: date-time
           description: When PayPal paid the store.
           example: 2026-10-10T09:15:02.000Z
+    OrderSummary:
+      type: object
+      description: |
+        What the agent may know about the order a paid purchase created. The
+        store gets the items and the owner's address; the agent only sees the
+        address label and whether the store has seen or shipped it.
+      required:
+        - status
+        - ships_to
+      properties:
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        ships_to:
+          type:
+            - string
+            - "null"
+          description: The label of the owner's address it ships to, or null when nothing
+            ships.
+          example: Office
+    OrderStatus:
+      type: string
+      description: "`SENT` to the store, `SEEN` (the store confirmed it), `SHIPPED`,
+        or `CANCELLED` (PayPal did not complete the payment, or it was fully
+        refunded)."
+      enum:
+        - SENT
+        - SEEN
+        - SHIPPED
+        - CANCELLED
+      example: SENT
     DecisionOutcome:
       type: string
       description: What the rules (and the AI check) decided.

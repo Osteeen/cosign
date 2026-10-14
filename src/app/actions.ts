@@ -4,7 +4,7 @@
 // the form are only pointers, and every service re-checks that the owner owns them.
 
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
@@ -20,7 +20,9 @@ import { listSpending, type SpendingRow } from "@/lib/services/overview";
 import { createAgent, getAgent, revokeAgent, setAgentPaused } from "@/lib/services/agents";
 import { listStores } from "@/lib/services/stores";
 import { appUrl, ServiceError } from "@/lib/services/common";
-import { CATEGORIES, createSlip, endSlip, renewSlip } from "@/lib/services/slips";
+import { CATEGORIES, createSlip, endSlip, renewSlip, setSlipShipTo } from "@/lib/services/slips";
+import { archiveAddress, createAddress, updateAddress } from "@/lib/services/addresses";
+import { confirmOrder, markOrderShipped } from "@/lib/services/orders";
 import { decideApproval } from "@/lib/services/spend";
 
 const Uuid = z.uuid();
@@ -88,6 +90,7 @@ export async function createSlipAction(_prev: SlipFormState, form: FormData): Pr
   const categories = form.getAll("categories").map(String);
   const endsOn = str(form, "endsOn");
   const sourceText = str(form, "sourceText");
+  const shipToAddressId = str(form, "shipToAddressId") || null;
 
   if (budget === null || perPurchase === null || approveAbove === null) {
     return { status: "error", message: "Enter amounts in dollars, like 200 or 49.99." };
@@ -129,6 +132,7 @@ export async function createSlipAction(_prev: SlipFormState, form: FormData): Pr
       expiresAt,
       sourceText: sourceText || "Set by the owner on the slip form",
       allocations,
+      shipToAddressId,
     });
   } catch (e) {
     if (e instanceof ServiceError) return { status: "error", message: e.message };
@@ -252,8 +256,93 @@ export async function demoSignInAction() {
 }
 
 // The demo account shares one set of PayPal holds: these would break it for the next judge.
-async function blockDemo(ownerId: string, back: string) {
-  if (isDemoOwner(ownerId)) redirect(notice(back, "demo-blocked"));
+// ---------------------------------------------------------------- addresses
+
+// Where to go back to after the address book: only our own pages.
+function safeBack(value: string): string {
+  return /^\/agents\/[0-9a-f-]{36}(\/slip)?$/.test(value) ? value : "/addresses";
+}
+
+export type AddressFormState = { status: "idle" } | { status: "error"; message: string };
+
+export async function saveAddressAction(_prev: AddressFormState, form: FormData): Promise<AddressFormState> {
+  const owner = await requireOwner();
+  // The demo account is shared: an address typed there would be seen by others.
+  if (isDemoOwner(owner.id)) return { status: "error", message: "The demo account uses a sample address and can't save new ones." };
+  const addressId = str(form, "addressId");
+  const input = {
+    label: str(form, "label"),
+    recipient: str(form, "recipient"),
+    line1: str(form, "line1"),
+    line2: str(form, "line2"),
+    city: str(form, "city"),
+    region: str(form, "region").toUpperCase(),
+    postal_code: str(form, "postal_code"),
+  };
+  try {
+    if (addressId) await updateAddress(owner.id, addressId, input);
+    else await createAddress(owner.id, input);
+  } catch (e) {
+    if (e instanceof ServiceError) return { status: "error", message: e.message };
+    if (e instanceof z.ZodError) {
+      const issue = e.issues[0];
+      const field = String(issue?.path[0] ?? "");
+      const what: Record<string, string> = { label: "label", recipient: "recipient name", line1: "street address", line2: "second line", city: "city", region: "state", postal_code: "ZIP code" };
+      return { status: "error", message: field === "region" ? "Use a two-letter US state code, like CA." : field === "postal_code" ? (issue?.message ?? "Check the ZIP code.") : `Check the ${what[field] ?? "address"}.` };
+    }
+    throw e;
+  }
+  revalidatePath("/addresses");
+  redirect(notice(safeBack(str(form, "back")), addressId ? "address-saved" : "address-added"));
+}
+
+export async function archiveAddressAction(form: FormData) {
+  const owner = await requireOwner();
+  await blockDemo(owner.id, "/addresses", "demo-address");
+  const addressId = id(form, "addressId");
+  await runOrNotice(() => archiveAddress(owner.id, addressId), "/addresses");
+  revalidatePath("/addresses");
+  redirect(notice("/addresses", "address-removed"));
+}
+
+export async function setShipToAction(form: FormData) {
+  const owner = await requireOwner();
+  const slipId = id(form, "slipId");
+  const agentId = id(form, "agentId");
+  await blockDemo(owner.id, `/agents/${agentId}`, "demo-address");
+  const addressId = str(form, "addressId") || null;
+  await runOrNotice(() => setSlipShipTo(owner.id, slipId, addressId), `/agents/${agentId}`);
+  revalidatePath(`/agents/${agentId}`);
+  redirect(notice(`/agents/${agentId}`, "ship-to-changed"));
+}
+
+// The store's buttons on its order page: authorized by the link's signed
+// token, not a sign-in. A wrong token looks like a missing order.
+async function storeOrderStep(form: FormData, step: (orderId: string, token: string) => Promise<{ status: string }>, done: string) {
+  const orderId = str(form, "orderId");
+  const token = str(form, "t");
+  let code: string;
+  try {
+    const order = await step(orderId, token);
+    code = order.status === "CANCELLED" ? "order-cancelled" : done;
+  } catch (e) {
+    if (e instanceof ServiceError && e.status === 404) notFound();
+    if (e instanceof ServiceError) code = e.code;
+    else throw e;
+  }
+  redirect(`/orders/${orderId}?t=${encodeURIComponent(token)}&notice=${code}`);
+}
+
+export async function confirmOrderAction(form: FormData) {
+  await storeOrderStep(form, confirmOrder, "order-confirmed");
+}
+
+export async function markShippedAction(form: FormData) {
+  await storeOrderStep(form, markOrderShipped, "order-shipped");
+}
+
+async function blockDemo(ownerId: string, back: string, code = "demo-blocked") {
+  if (isDemoOwner(ownerId)) redirect(notice(back, code));
 }
 
 // Turns a ServiceError into a notice on the page instead of an error screen.

@@ -23,6 +23,7 @@ Agents never see PayPal credentials, and Cosign never holds funds.
 - **Agent API** (REST, OpenAPI 3.1 in [`api/openapi.yaml`](api/openapi.yaml)) and an **MCP server** at `/api/mcp`, so MCP-capable assistants can pay within a slip.
 - **Owner app**: passwordless email sign-in, dashboard sorted by what needs attention, approvals by email and in the app, approve or decline several at once, a permanent activity log, light and dark themes, phone layout.
 - **Spending control room** (AG Grid + AG Charts): every purchase live, with flashing updates as agents buy, decisions straight from the grid, grouping by agent or store with subtotals, expandable purchase details, totals that follow filters, and spend charts.
+- **Order handoff**: an owner address book and a ship-to address per slip; the address goes on the PayPal budget hold (the store sees it in PayPal), and every paid purchase becomes an order the store opens with a private link, confirms and marks shipped. Agents only ever see the address label.
 - **Product search for agents** (`GET /agent/products`, MCP `cosign_find_products`): products at the agent's own stores with what the rules would decide, next to like-for-like prices elsewhere (Channel3, judged by AI).
 - **Market prices** (Channel3) on purchases that wait for the owner.
 - **Demo**: two demo stores (sandbox merchants), a procurement bot that falls for a hidden "buy 50 units now" note, and a one-click demo account for judges.

@@ -37,6 +37,10 @@ class Slip(SdkBaseModel):
     expires_at: RFC3339DateTime | None
     """When the slip ends for good, or null if the owner set no end date."""
 
+    ships_to: str | None
+    """The label of the owner's address that this agent's orders ship to, e.g. "Office". The agent never sees or chooses
+    the address itself: the store gets it with each paid order. Null when nothing ships."""
+
     stores: list[StoreAllowance]
     """Only stores with an approved budget hold for this period."""
 
@@ -50,4 +54,5 @@ class SlipDict(TypedDict):
     approve_above: MoneyDict
     categories: list[CategoryOrStr]
     expires_at: RFC3339DateTime | None
+    ships_to: str | None
     stores: list[StoreAllowanceDict]

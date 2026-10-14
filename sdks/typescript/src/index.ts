@@ -23,6 +23,8 @@ export { marketOfferSchema, type MarketOffer } from "./models/market-offer.js";
 export { marketPricesSchema, type MarketPrices } from "./models/market-prices.js";
 export { MarketVerdict, marketVerdictSchema } from "./models/market-verdict.js";
 export { moneySchema, type Money } from "./models/money.js";
+export { OrderStatus, orderStatusSchema } from "./models/order-status.js";
+export { orderSummarySchema, type OrderSummary } from "./models/order-summary.js";
 export { problemSchema, type Problem } from "./models/problem.js";
 export { problemErrorSchema, type ProblemError } from "./models/problem-error.js";
 export { productSearchSchema, type ProductSearch } from "./models/product-search.js";

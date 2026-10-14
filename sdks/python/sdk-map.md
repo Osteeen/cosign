@@ -184,8 +184,8 @@ Sub-pages chunk per `###` block: each block is self-contained given the table ab
 
 | Group | Count | Directory (module = `<type_name>.py`) |
 | --- | --- | --- |
-| Models (`SdkBaseModel` pydantic classes) | 24 | `cosign_agent_api/models/` |
-| Enums (`Enum` over `str`) — Python member names + wire values | 9 | `cosign_agent_api/models/enums/` |
+| Models (`SdkBaseModel` pydantic classes) | 25 | `cosign_agent_api/models/` |
+| Enums (`Enum` over `str`) — Python member names + wire values | 10 | `cosign_agent_api/models/enums/` |
 | Error aliases (one per Case A operation) | 6 | `cosign_agent_api/errors/` |
 
 Conventions: a model is a `SdkBaseModel` (pydantic) class; a field whose wire name differs from its Python name carries it as `Field(alias=…)` (`type_` ↔ `"type"`) — read the alias off the field rather than deriving it. An omittable field is annotated `Optional[T]` and defaults to `UNSET`, and one that may also be explicitly null is `OptionalNullable[T]`; both come from `core` and neither is `typing.Optional` — there is no `None` arm unless the spec declared the property nullable, so passing `None` to the first is a type error rather than a value that serializes.

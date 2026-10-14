@@ -8,11 +8,12 @@ import "server-only";
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { agents, holds, slips, slipStores, stores } from "@/db/schema";
+import { addresses, agents, holds, slips, slipStores, stores } from "@/db/schema";
 import { authorizeOrder, createHoldOrder, getOrder, voidHold } from "@/lib/paypal/holds";
 import { PayPalError } from "@/lib/paypal/client";
 import type { Category } from "@/lib/rules/types";
-import { addDays, appUrl, logActivity, notFound, ServiceError } from "./common";
+import { addDays, appUrl, logActivity, notFound, ServiceError, type Tx } from "./common";
+import { shipToOf } from "./addresses";
 import { denyPendingApprovals, releaseHoldsAtPayPal } from "./agents";
 
 export const CATEGORIES = [
@@ -40,6 +41,8 @@ export const SlipInput = z
     sourceText: z.string().trim().min(3).max(1000),
     // Each store's share; omitted means an even split.
     allocations: z.record(z.uuid(), z.int().min(100)).nullable(),
+    // Where purchases ship (one of the owner's addresses); null = no address.
+    shipToAddressId: z.uuid().nullable().optional(),
   })
   .refine((s) => new Set(s.storeIds).size === s.storeIds.length, { message: "A store is listed twice." })
   .refine((s) => s.perPurchaseMaxCents <= s.periodBudgetCents, { message: "The per-purchase limit cannot be more than the budget." });
@@ -114,6 +117,7 @@ export async function createSlip(ownerId: string, agentId: string, raw: SlipInpu
 
     const known = await tx.select({ id: stores.id }).from(stores).where(inArray(stores.id, input.storeIds));
     if (known.length !== input.storeIds.length) throw new ServiceError(422, "unknown_store", "One of the stores is not available.");
+    if (input.shipToAddressId) await assertOwnAddress(tx, ownerId, input.shipToAddressId);
 
     const [slip] = await tx
       .insert(slips)
@@ -128,6 +132,7 @@ export async function createSlip(ownerId: string, agentId: string, raw: SlipInpu
         categories: input.categories,
         expiresAt: input.expiresAt,
         sourceText: input.sourceText,
+        shipToAddressId: input.shipToAddressId ?? null,
         currentPeriodStartsAt: now,
         currentPeriodEndsAt: addDays(now, input.periodDays),
       })
@@ -147,8 +152,40 @@ export async function createSlip(ownerId: string, agentId: string, raw: SlipInpu
   return created.slip;
 }
 
-// Opens one PayPal order per hold (outside any DB transaction).
+async function assertOwnAddress(tx: Tx, ownerId: string, addressId: string) {
+  const [address] = await tx
+    .select({ id: addresses.id })
+    .from(addresses)
+    .where(and(eq(addresses.id, addressId), eq(addresses.ownerId, ownerId), isNull(addresses.archivedAt)))
+    // Held until the slip is saved, so a removal can't happen in between.
+    .for("share");
+  if (!address) throw new ServiceError(422, "unknown_address", "Choose one of your saved addresses.");
+}
+
+// Changes where a live slip's purchases ship. Orders already sent keep their
+// copy; budget holds already at PayPal keep the address they were opened with.
+export async function setSlipShipTo(ownerId: string, slipId: string, addressId: string | null) {
+  if (!z.uuid().safeParse(slipId).success) throw notFound("Permission slip");
+  if (addressId !== null && !z.uuid().safeParse(addressId).success) throw new ServiceError(422, "unknown_address", "Choose one of your saved addresses.");
+  return db.transaction(async (tx) => {
+    if (addressId) await assertOwnAddress(tx, ownerId, addressId);
+    const [updated] = await tx
+      .update(slips)
+      .set({ shipToAddressId: addressId })
+      .where(and(eq(slips.id, slipId), eq(slips.ownerId, ownerId), inArray(slips.status, ["AWAITING_HOLDS", "ACTIVE"])))
+      .returning({ agentId: slips.agentId });
+    if (!updated) throw notFound("Permission slip");
+    return updated;
+  });
+}
+
+// Opens one PayPal order per hold (outside any DB transaction). The slip's
+// ship-to address goes on each hold, so the store sees it in PayPal.
 async function openHoldsAtPayPal(ownerId: string, agentId: string, newHolds: (typeof holds.$inferSelect)[]) {
+  if (newHolds.length === 0) return;
+  const [slipRow] = await db.select({ shipTo: slips.shipToAddressId }).from(slips).where(and(eq(slips.id, newHolds[0]!.slipId), eq(slips.ownerId, ownerId)));
+  const [address] = slipRow?.shipTo ? await db.select().from(addresses).where(and(eq(addresses.id, slipRow.shipTo), eq(addresses.ownerId, ownerId))) : [];
+  const shipTo = address ? shipToOf(address) : null;
   const merchantRows = await db
     .select({ id: stores.id, merchantId: stores.paypalMerchantId })
     .from(stores)
@@ -162,6 +199,7 @@ async function openHoldsAtPayPal(ownerId: string, agentId: string, newHolds: (ty
         amountCents: hold.amountCents,
         returnUrl: `${appUrl()}/api/paypal/hold-return`,
         cancelUrl: `${appUrl()}/agents/${agentId}/holds?notice=hold-cancelled`,
+        shipTo,
       });
       await db.update(holds).set({ paypalOrderId: orderId }).where(and(eq(holds.id, hold.id), eq(holds.ownerId, ownerId)));
     } catch (e) {

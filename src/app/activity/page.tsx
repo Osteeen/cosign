@@ -22,6 +22,8 @@ const STAMP: Record<string, { cls: string; label: string }> = {
   HOLD_RELEASE_FAILED: { cls: "ask", label: "Check" },
   PAYMENT_REVERSED: { cls: "deny", label: "Reversed" },
   PAYMENT_NEEDS_REVIEW: { cls: "ask", label: "Check" },
+  ORDER_SHIPPED: { cls: "allow", label: "Shipped" },
+  ORDER_CANCELLED: { cls: "deny", label: "Cancelled" },
   PAYMENT_REFUNDED: { cls: "ask", label: "Refunded" },
 };
 

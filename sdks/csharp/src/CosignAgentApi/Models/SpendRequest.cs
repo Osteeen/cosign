@@ -85,6 +85,12 @@ public record SpendRequest
     public required Receipt? Receipt { get; init; }
 
     /// <summary>
+    /// The order handed to the store once the request is paid; null before that.
+    /// </summary>
+    [JsonPropertyName("order")]
+    public required OrderSummary? Order { get; init; }
+
+    /// <summary>
     /// When the agent asked.
     /// </summary>
     [JsonPropertyName("created_at")]

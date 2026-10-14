@@ -8,6 +8,7 @@ from .market_comparison import MarketComparison, MarketComparisonDict
 from .market_offer import MarketOffer, MarketOfferDict
 from .market_prices import MarketPrices, MarketPricesDict
 from .money import Money, MoneyDict
+from .order_summary import OrderSummary, OrderSummaryDict
 from .problem import Problem, ProblemDict
 from .problem_error import ProblemError, ProblemErrorDict
 from .product_search import ProductSearch, ProductSearchDict
@@ -44,6 +45,8 @@ __all__ = [
     "MarketPricesDict",
     "Money",
     "MoneyDict",
+    "OrderSummary",
+    "OrderSummaryDict",
     "Problem",
     "ProblemDict",
     "ProblemError",

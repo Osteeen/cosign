@@ -9,6 +9,7 @@ from .decision import Decision, DecisionDict
 from .enums.spend_request_status import SpendRequestStatusOrStr
 from .line_item import LineItem, LineItemDict
 from .money import Money, MoneyDict
+from .order_summary import OrderSummary, OrderSummaryDict
 from .receipt import Receipt, ReceiptDict
 
 
@@ -55,6 +56,9 @@ class SpendRequest(SdkBaseModel):
     receipt: Receipt | None
     """Filled in when the request is COMPLETED."""
 
+    order: OrderSummary | None
+    """The order handed to the store once the request is paid; null before that."""
+
     created_at: RFC3339DateTime
     """When the agent asked."""
 
@@ -71,4 +75,5 @@ class SpendRequestDict(TypedDict):
     cart_hash: str
     approval_expires_at: RFC3339DateTime | None
     receipt: ReceiptDict | None
+    order: OrderSummaryDict | None
     created_at: RFC3339DateTime

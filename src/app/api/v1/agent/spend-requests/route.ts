@@ -1,4 +1,5 @@
 import { authenticateAgent, fromError, json, problem, rateLimit, tooMany, unauthorized } from "@/lib/api";
+import { ordersForPurchases } from "@/lib/services/orders";
 import { createSpendRequest, listSpendRequestsForAgent, SpendBody, toApi } from "@/lib/services/spend";
 
 // Ask to pay a store. The rules engine decides; ALLOW is paid inside this request.
@@ -27,7 +28,8 @@ export async function POST(request: Request) {
     }
 
     const { row, replay } = await createSpendRequest(agent.id, key, parsed.data);
-    return json(toApi(row), replay ? 200 : 201);
+    const orders = await ordersForPurchases(row.ownerId, [row.id]);
+    return json(toApi(row, orders.get(row.id)), replay ? 200 : 201);
   } catch (e) {
     return fromError(e);
   }
@@ -40,7 +42,8 @@ export async function GET(request: Request) {
     if (!agent) return unauthorized();
     const limit = Math.min(Math.max(Number(new URL(request.url).searchParams.get("limit")) || 25, 1), 100);
     const rows = await listSpendRequestsForAgent(agent.id, limit);
-    return json({ data: rows.map(toApi), next_cursor: null });
+    const orders = await ordersForPurchases(agent.ownerId, rows.map((r) => r.id));
+    return json({ data: rows.map((r) => toApi(r, orders.get(r.id))), next_cursor: null });
   } catch (e) {
     return fromError(e);
   }

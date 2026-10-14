@@ -4,6 +4,7 @@ from .currency import Currency, CurrencyOrStr
 from .decision_outcome import DecisionOutcome, DecisionOutcomeOrStr
 from .intent_verdict import IntentVerdict, IntentVerdictOrStr
 from .market_verdict import MarketVerdict, MarketVerdictOrStr
+from .order_status import OrderStatus, OrderStatusOrStr
 from .reason_code import ReasonCode, ReasonCodeOrStr
 from .spend_request_status import SpendRequestStatus, SpendRequestStatusOrStr
 from .token_type import TokenType, TokenTypeOrStr
@@ -21,6 +22,8 @@ __all__ = [
     "IntentVerdictOrStr",
     "MarketVerdict",
     "MarketVerdictOrStr",
+    "OrderStatus",
+    "OrderStatusOrStr",
     "ReasonCode",
     "ReasonCodeOrStr",
     "SpendRequestStatus",

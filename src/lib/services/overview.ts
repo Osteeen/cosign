@@ -49,7 +49,7 @@ export async function recentActivity(ownerId: string, agentId?: string, limit = 
 
 // Groups people filter by; each maps to the event types it covers.
 export const ACTIVITY_GROUPS = {
-  paid: { label: "Paid", types: ["PAYMENT_CAPTURED", "SPEND_ALLOWED", "PAYMENT_REFUNDED"] },
+  paid: { label: "Paid", types: ["PAYMENT_CAPTURED", "SPEND_ALLOWED", "PAYMENT_REFUNDED", "ORDER_SHIPPED", "ORDER_CANCELLED"] },
   blocked: { label: "Blocked", types: ["SPEND_DENIED"] },
   approvals: { label: "Approvals", types: ["APPROVAL_REQUESTED", "APPROVAL_GRANTED", "APPROVAL_DENIED"] },
   holds: { label: "Budget holds", types: ["HOLD_APPROVED", "HOLD_REAUTHORIZED", "HOLD_RELEASED", "HOLD_EXPIRED"] },

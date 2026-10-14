@@ -19,7 +19,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: "Other",
 };
 
-export function SlipForm({ agentId, agentName, stores }: { agentId: string; agentName: string; stores: { id: string; name: string }[] }) {
+export function SlipForm({
+  agentId,
+  agentName,
+  stores,
+  addresses,
+}: {
+  agentId: string;
+  agentName: string;
+  stores: { id: string; name: string }[];
+  addresses: { id: string; label: string; summary: string }[];
+}) {
   const [state, formAction] = useActionState<SlipFormState, FormData>(createSlipAction, { status: "idle" });
   const [budget, setBudget] = useState("200");
   const [periodDays, setPeriodDays] = useState("28");
@@ -28,6 +38,7 @@ export function SlipForm({ agentId, agentName, stores }: { agentId: string; agen
   const [chosen, setChosen] = useState<string[]>(stores.map((s) => s.id));
   const [shares, setShares] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<string[]>(["office_supplies", "groceries"]);
+  const [shipTo, setShipTo] = useState<string>(addresses[0]?.id ?? "");
   const [words, setWords] = useState("");
   const [endsOn, setEndsOn] = useState<string | null | undefined>(undefined);
   const [drafting, setDrafting] = useState(false);
@@ -234,6 +245,28 @@ export function SlipForm({ agentId, agentName, stores }: { agentId: string; agen
             ))}
           </div>
           <FieldError name="categories" errors={errors} />
+        </fieldset>
+
+        <fieldset className="fieldset">
+          <legend className="field-label">Ship orders to</legend>
+          <p className="muted field-help">Stores get this address with every paid order, and see it in PayPal. {agentName} only ever sees the label.</p>
+          <div className="check-grid check-grid-wide">
+            {addresses.map((a) => (
+              <label className="check" key={a.id}>
+                <input type="radio" name="shipToAddressId" value={a.id} checked={shipTo === a.id} onChange={() => setShipTo(a.id)} />
+                <span>
+                  {a.label} <span className="muted">- {a.summary}</span>
+                </span>
+              </label>
+            ))}
+            <label className="check">
+              <input type="radio" name="shipToAddressId" value="" checked={shipTo === ""} onChange={() => setShipTo("")} />
+              <span>No address - nothing to ship (services, downloads)</span>
+            </label>
+          </div>
+          <p className="muted">
+            <a href={`/addresses?back=/agents/${agentId}/slip`}>{addresses.length ? "Add or change addresses" : "Add an address"}</a>
+          </p>
         </fieldset>
 
         <DatePicker name="endsOn" label="End date (optional)" placeholder="No end date - runs until you end it" value={endsOn} />

@@ -160,8 +160,8 @@ Each links to a sub-page with one row per operation: signature, the request reco
 
 | Group | Count | Directory (file = `<TypeName>.cs`) |
 | --- | --- | --- |
-| Records (plain `record` data models) | 24 | `src/CosignAgentApi/Models/` |
-| Enums (`OpenStringEnum<T>` / `OpenIntEnum<T>`) — C# member names + wire values | 9 | `src/CosignAgentApi/Models/Enums/` |
+| Records (plain `record` data models) | 25 | `src/CosignAgentApi/Models/` |
+| Enums (`OpenStringEnum<T>` / `OpenIntEnum<T>`) — C# member names + wire values | 10 | `src/CosignAgentApi/Models/Enums/` |
 | Typed error classes (`: ApiError`, one per Case A operation) | 6 | `src/CosignAgentApi/Errors/` |
 | Request records (one per operation that takes input; never serialized) | 4 | `src/CosignAgentApi/Requests/` — a controller's records sit in a folder named after it (an operation with several tags is filed under the first tag it declares) |
 

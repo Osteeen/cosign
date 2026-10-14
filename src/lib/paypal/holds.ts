@@ -5,6 +5,7 @@
 import "server-only";
 import {
   CheckoutPaymentIntent,
+  FulfillmentType,
   OrdersController,
   PaymentsController,
   PaypalExperienceUserAction,
@@ -12,6 +13,7 @@ import {
 } from "@paypal/paypal-server-sdk";
 import { authAssertion, call, PayPalError, paypalClient } from "./client";
 import { centsToPayPal, payPalToCents } from "../money";
+import type { ShipTo } from "../services/addresses";
 
 // Ask PayPal for the full order/payment in each response (we read the
 // authorization out of it).
@@ -26,6 +28,8 @@ export async function createHoldOrder(input: {
   amountCents: number;
   returnUrl: string;
   cancelUrl: string;
+  // Where the owner's orders ship: shown to the store in its PayPal transaction.
+  shipTo?: ShipTo | null;
 }): Promise<{ orderId: string; approveUrl: string }> {
   const order = await call("create hold order", () =>
     orders().createOrder({
@@ -41,13 +45,30 @@ export async function createHoldOrder(input: {
             description: "Cosign budget hold for your agent",
             amount: { currencyCode: "USD", value: centsToPayPal(input.amountCents) },
             payee: { merchantId: input.storeMerchantId },
+            ...(input.shipTo
+              ? {
+                  shipping: {
+                    type: FulfillmentType.Shipping,
+                    name: { fullName: input.shipTo.recipient },
+                    address: {
+                      addressLine1: input.shipTo.line1,
+                      ...(input.shipTo.line2 ? { addressLine2: input.shipTo.line2 } : {}),
+                      adminArea2: input.shipTo.city,
+                      adminArea1: input.shipTo.region,
+                      postalCode: input.shipTo.postal_code,
+                      countryCode: input.shipTo.country_code,
+                    },
+                  },
+                }
+              : {}),
           },
         ],
         paymentSource: {
           paypal: {
             experienceContext: {
               brandName: "Cosign (sandbox)",
-              shippingPreference: PaypalWalletContextShippingPreference.NoShipping,
+              // The owner's own address, fixed: the buyer can't change it at PayPal.
+              shippingPreference: input.shipTo ? PaypalWalletContextShippingPreference.SetProvidedAddress : PaypalWalletContextShippingPreference.NoShipping,
               userAction: PaypalExperienceUserAction.Continue,
               returnUrl: input.returnUrl,
               cancelUrl: input.cancelUrl,
