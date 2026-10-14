@@ -13,7 +13,7 @@ FindProductsErrorBody: TypeAlias = Problem | RawError
 class _FindProductsError:
     def map(self, status_code: int, content: bytes) -> FindProductsErrorBody:
         match status_code:
-            case 400 | 401 | 429 | 500:
+            case 400 | 401 | 403 | 429 | 500:
                 return decode_json[Problem](content)
             case _:
                 return RawError(status_code, content)

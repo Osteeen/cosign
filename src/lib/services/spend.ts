@@ -13,11 +13,11 @@
 
 import "server-only";
 import { after } from "next/server";
-import { and, desc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { agents, approvals, holds, slips, slipStores, spendRequests, stores } from "@/db/schema";
-import { captureFromHold } from "@/lib/paypal/holds";
+import { captureFromHold, capturesOnOrder, COUNTED_CAPTURE } from "@/lib/paypal/holds";
 import { authorizationForCapture } from "./reauth";
 import { PayPalError } from "@/lib/paypal/client";
 import { cartHash } from "@/lib/rules/cart-hash";
@@ -27,6 +27,7 @@ import type { Category, FinalDecision, IntentResult, SpendRequestInput } from "@
 import { formatUsd } from "@/lib/money";
 import { logActivity, notFound, ServiceError, sha256, type Tx } from "./common";
 import { notifyApprovalNeeded } from "./notify";
+import { isDemoOwner } from "@/lib/demo/account";
 import { cancelOrderForPurchase, confirmOrderPayment, createOrderForPaidPurchase } from "./orders";
 import { CATEGORIES, rollOverAgentIfDue } from "./slips";
 
@@ -82,7 +83,9 @@ async function loadContext(q: Tx, agentId: string, storeId: string, lock: boolea
     const holdsQ = q.select().from(holds).where(and(eq(holds.slipId, slip.id), eq(holds.periodIndex, slip.currentPeriodIndex)));
     const periodHolds = lock ? await holdsQ.for("update") : await holdsQ;
     committedCents = periodHolds.reduce((sum, h) => sum + h.capturedCents + h.reservedCents, 0);
-    hold = periodHolds.find((h) => h.storeId === storeId && h.status === "ACTIVE");
+    // A frozen hold (PayPal disagrees with Cosign) or one PayPal has let lapse can't be spent from.
+    const now = new Date();
+    hold = periodHolds.find((h) => h.storeId === storeId && h.status === "ACTIVE" && !h.frozenAt && (!h.expiresAt || h.expiresAt > now));
     slipStoreIds = (await q.select({ id: slipStores.storeId }).from(slipStores).where(eq(slipStores.slipId, slip.id))).map((r) => r.id);
   }
   return { agent, slip, hold, committedCents, slipStoreIds };
@@ -288,7 +291,29 @@ function isUniqueViolation(e: unknown): boolean {
 //   reservation is never released while the money might have moved.
 const RETRY_DELAYS_MS = [400, 1200];
 
-async function capture(row: SpendRow): Promise<SpendRow> {
+const CAPTURE_LEASE_MS = 90_000;
+
+async function capture(input: SpendRow): Promise<SpendRow> {
+  // One caller at a time talks to PayPal for a purchase (an agent retry or
+  // the daily job can arrive while a first attempt is still waiting).
+  const now = new Date();
+  const [leased] = await db
+    .update(spendRequests)
+    .set({ captureLeaseUntil: new Date(now.getTime() + CAPTURE_LEASE_MS) })
+    .where(
+      and(
+        eq(spendRequests.id, input.id),
+        eq(spendRequests.status, "PROCESSING"),
+        or(isNull(spendRequests.captureLeaseUntil), lt(spendRequests.captureLeaseUntil, now)),
+      ),
+    )
+    .returning();
+  if (!leased) {
+    const [current] = await db.select().from(spendRequests).where(eq(spendRequests.id, input.id));
+    return current ?? input;
+  }
+  const row = leased;
+
   // Pin the authorization on the first attempt; every retry reuses it with the
   // same PayPal-Request-Id, so a reauthorization in between cannot double-charge.
   let authorizationId = row.captureAuthorizationId;
@@ -307,25 +332,42 @@ async function capture(row: SpendRow): Promise<SpendRow> {
     try {
       const result = await captureFromHold({ authorizationId, amountCents: row.totalCents, spendRequestId: row.id });
       if (result.status === "COMPLETED" || result.status === "PENDING") return settle(row, result.captureId, null, result.status === "PENDING");
-      return settle(row, null, `capture_${result.status.toLowerCase()}`);
+      return failUnlessPaid(row, `capture_${result.status.toLowerCase()}`);
     } catch (e) {
-      if (e instanceof PayPalError && e.definite) return settle(row, null, e.issue ?? `http_${e.status}`);
+      if (e instanceof PayPalError && e.definite) return failUnlessPaid(row, e.issue ?? `http_${e.status}`);
       const delay = RETRY_DELAYS_MS[attempt];
-      if (delay === undefined) {
-        await logActivity(db, {
-          ownerId: row.ownerId,
-          agentId: row.agentId,
-          spendRequestId: row.id,
-          type: "PAYMENT_UNCONFIRMED",
-          amountCents: row.totalCents,
-          summary: `Waiting for PayPal to confirm ${formatUsd(row.totalCents)}; the amount stays reserved`,
-          data: { issue: e instanceof PayPalError ? e.issue : "error" },
-        });
-        return row;
-      }
+      if (delay === undefined) return stillUnconfirmed(row, e instanceof PayPalError ? e.issue : "error");
       await new Promise((r) => setTimeout(r, delay));
     }
   }
+}
+
+async function stillUnconfirmed(row: SpendRow, issue: string | null): Promise<SpendRow> {
+  await logActivity(db, {
+    ownerId: row.ownerId,
+    agentId: row.agentId,
+    spendRequestId: row.id,
+    type: "PAYMENT_UNCONFIRMED",
+    amountCents: row.totalCents,
+    summary: `Waiting for PayPal to confirm ${formatUsd(row.totalCents)}; the amount stays reserved`,
+    data: { issue },
+  });
+  return row;
+}
+
+// PayPal refused this attempt. That alone doesn't prove nothing was paid (an
+// earlier attempt's answer may have been lost), so check PayPal's own record
+// of the hold's captures before releasing anything. If PayPal can't be asked,
+// the amount stays reserved and the purchase stays processing.
+async function failUnlessPaid(row: SpendRow, failure: string): Promise<SpendRow> {
+  try {
+    const [hold] = await db.select({ orderId: holds.paypalOrderId }).from(holds).where(eq(holds.id, row.holdId!));
+    const paid = hold?.orderId ? (await capturesOnOrder(hold.orderId)).find((c) => c.invoiceId === row.id && COUNTED_CAPTURE.has(c.status)) : undefined;
+    if (paid) return settle(row, paid.id, null, paid.status === "PENDING");
+  } catch (e) {
+    return stillUnconfirmed(row, e instanceof PayPalError ? e.issue : "error");
+  }
+  return settle(row, null, failure);
 }
 
 // A request left PROCESSING (PayPal did not answer, or the server stopped
@@ -419,17 +461,19 @@ export async function captureConfirmedByPayPal(spendId: unknown, captureId: stri
   if (row.status === "COMPLETED") {
     // A capture that was PENDING is now complete: the store may ship.
     if (row.paypalCaptureId === captureId) return (await confirmOrderPayment(row.id)) ? "payment_confirmed" : "already_paid";
-    await needsReview(row, `PayPal reports a second payment for this purchase (${amountCents === null ? "amount unknown" : formatUsd(amountCents)}); check it with the store`, { captureId });
+    // Money left the hold that Cosign never counted: stop the hold from
+    // spending any more until the owner has looked.
+    await freezeHold(row.holdId!, `PayPal reports a second payment for a purchase (${amountCents === null ? "amount unknown" : formatUsd(amountCents)}); spending from this hold is paused until you check it with the store`);
     return "flagged_second_capture";
   }
-  if (row.status !== "PROCESSING") {
-    // Cosign counted it as not paid (or never sent it), but PayPal took the money.
-    await needsReview(row, `PayPal reports a payment of ${amountCents === null ? "an unknown amount" : formatUsd(amountCents)} that Cosign recorded as not paid; check it with the store`, { captureId, status: row.status });
-    return `flagged_${row.status.toLowerCase()}`;
-  }
   if (amountCents !== row.totalCents) {
-    await needsReview(row, `PayPal reports ${amountCents === null ? "an unknown amount" : formatUsd(amountCents)} for a ${formatUsd(row.totalCents)} purchase; it was not marked paid`, { captureId });
+    await freezeHold(row.holdId!, `PayPal reports ${amountCents === null ? "an unknown amount" : formatUsd(amountCents)} for a ${formatUsd(row.totalCents)} purchase; spending from this hold is paused until you check it with the store`);
     return "flagged_amount_mismatch";
+  }
+  if (row.status !== "PROCESSING") {
+    // Cosign had recorded it as not paid, but PayPal took the money: count it
+    // now, so the budget can't be spent twice.
+    return (await correctToPaid(row, captureId, false)) ? `corrected_${row.status.toLowerCase()}` : "flagged_could_not_correct";
   }
   await settle(row, captureId, null);
   return "settled_paid";
@@ -498,6 +542,114 @@ export async function captureRefundedAtPayPal(captureId: string, amountCents: nu
   return reversed ? "noted_reversal" : "noted_refund";
 }
 
+// ------------------------------------------- reconciliation with PayPal
+
+// PayPal took the money for a purchase Cosign had recorded as not paid: count
+// it as paid (the hold's spent total goes up, the store gets its order) and
+// tell the owner. False if the hold has no room left on Cosign's side - then
+// the hold is frozen for the owner to sort out.
+async function correctToPaid(row: SpendRow, captureId: string, pending: boolean): Promise<boolean> {
+  try {
+    const corrected = await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(spendRequests).where(eq(spendRequests.id, row.id)).for("update");
+      if (!current || current.status === "COMPLETED") return false;
+      const released = current.status !== "PROCESSING" && current.status !== "PENDING_APPROVAL";
+      await tx
+        .update(holds)
+        .set(
+          released
+            ? { capturedCents: sql`${holds.capturedCents} + ${current.totalCents}` }
+            : { capturedCents: sql`${holds.capturedCents} + ${current.totalCents}`, reservedCents: sql`${holds.reservedCents} - ${current.totalCents}` },
+        )
+        .where(eq(holds.id, current.holdId!));
+      const [updated] = await tx
+        .update(spendRequests)
+        .set({ status: "COMPLETED", paypalCaptureId: captureId, paidAt: new Date() })
+        .where(eq(spendRequests.id, current.id))
+        .returning();
+      await createOrderForPaidPurchase(tx, updated!, { paymentPending: pending });
+      await logActivity(tx, {
+        ownerId: current.ownerId,
+        agentId: current.agentId,
+        spendRequestId: current.id,
+        type: "PAYMENT_NEEDS_REVIEW",
+        amountCents: current.totalCents,
+        summary: `PayPal had taken ${formatUsd(current.totalCents)} for this purchase after Cosign recorded it as not paid; it now counts as paid`,
+      });
+      return true;
+    });
+    return corrected;
+  } catch {
+    // Most likely the hold's own limit (captured + reserved <= amount).
+    await freezeHold(row.holdId!, `PayPal took ${formatUsd(row.totalCents)} that doesn't fit this hold in Cosign; spending from it is paused until you check it with the store`);
+    return false;
+  }
+}
+
+// Stops all spending from a hold whose PayPal record disagrees with Cosign's.
+async function freezeHold(holdId: string, summary: string) {
+  const [frozen] = await db
+    .update(holds)
+    .set({ frozenAt: new Date() })
+    .where(and(eq(holds.id, holdId), isNull(holds.frozenAt)))
+    .returning({ ownerId: holds.ownerId, slipId: holds.slipId });
+  if (!frozen) return;
+  const [slip] = await db.select({ agentId: slips.agentId }).from(slips).where(eq(slips.id, frozen.slipId));
+  await logActivity(db, { ownerId: frozen.ownerId, agentId: slip?.agentId, type: "PAYMENT_NEEDS_REVIEW", summary, data: { holdId } });
+}
+
+// Daily: compare each live hold with PayPal's own list of captures on it.
+// Purchases PayPal shows as paid are settled or corrected; any difference that
+// remains freezes the hold. This is the check that does not trust Cosign's
+// own counters.
+export async function reconcileHolds(): Promise<{ checked: number; corrected: number; frozen: number }> {
+  const live = await db
+    .select()
+    .from(holds)
+    .where(and(eq(holds.status, "ACTIVE"), isNotNull(holds.paypalOrderId), isNull(holds.frozenAt)))
+    .limit(200);
+  const out = { checked: 0, corrected: 0, frozen: 0 };
+  for (const hold of live) {
+    let captures;
+    try {
+      captures = (await capturesOnOrder(hold.paypalOrderId!)).filter((c) => COUNTED_CAPTURE.has(c.status));
+    } catch {
+      continue; // PayPal unreachable: try again tomorrow
+    }
+    out.checked++;
+    for (const c of captures) {
+      if (!isUuid(c.invoiceId)) continue;
+      const [row] = await db.select().from(spendRequests).where(and(eq(spendRequests.id, c.invoiceId), eq(spendRequests.holdId, hold.id)));
+      if (!row || row.status === "COMPLETED") continue;
+      if (row.status === "PROCESSING" && c.amountCents === row.totalCents) {
+        await settle(row, c.id, null, c.status === "PENDING");
+        out.corrected++;
+      } else if (c.amountCents === row.totalCents && (await correctToPaid(row, c.id, c.status === "PENDING"))) {
+        out.corrected++;
+      }
+    }
+    const paypalTotal = captures.reduce((sum, c) => sum + c.amountCents, 0);
+    const [now] = await db.select({ captured: holds.capturedCents }).from(holds).where(eq(holds.id, hold.id));
+    if (now && now.captured !== paypalTotal) {
+      await freezeHold(hold.id, `PayPal shows ${formatUsd(paypalTotal)} paid from this hold, Cosign ${formatUsd(now.captured)}; spending from it is paused until you check it`);
+      out.frozen++;
+    }
+  }
+  return out;
+}
+
+// Daily: purchases still processing (PayPal's answer was lost and the agent
+// never asked again) are retried with their original request ID.
+export async function resumeStuckPurchases(): Promise<number> {
+  const stuck = await db
+    .select()
+    .from(spendRequests)
+    .where(and(eq(spendRequests.status, "PROCESSING"), lt(spendRequests.createdAt, new Date(Date.now() - 5 * 60_000))))
+    .limit(50);
+  for (const row of stuck) await capture(row);
+  return stuck.length;
+}
+
 // ------------------------------------------------------------ approvals
 
 // Releases reservations for approvals that ran out of time. Called before an
@@ -530,6 +682,9 @@ export async function listPendingApprovals(ownerId: string) {
     .orderBy(desc(approvals.createdAt));
 }
 
+// What the shared demo keeps in each hold for the demo bot's own purchases.
+const DEMO_RESERVE_CENTS = 6000;
+
 export async function decideApproval(
   ownerId: string,
   approvalId: string,
@@ -537,6 +692,25 @@ export async function decideApproval(
   seen: { cartHash: string; totalCents: number },
 ): Promise<SpendRow> {
   await expireApprovals(ownerId);
+  // If the purchase's budget period has ended, switch periods first: the
+  // rollover declines approvals from the old period instead of paying them.
+  if (z.uuid().safeParse(approvalId).success) {
+    const [owned] = await db
+      .select({ agentId: spendRequests.agentId, hold: holds })
+      .from(approvals)
+      .innerJoin(spendRequests, eq(spendRequests.id, approvals.spendRequestId))
+      .leftJoin(holds, eq(holds.id, spendRequests.holdId))
+      .where(and(eq(approvals.id, approvalId), eq(approvals.ownerId, ownerId)));
+    if (owned) await rollOverAgentIfDue(owned.agentId);
+    // The shared demo account: approving pays from holds every visitor shares,
+    // so keep a reserve for the demo bot's own purchases.
+    if (owned?.hold && decision === "approve" && isDemoOwner(ownerId)) {
+      const leftAfter = owned.hold.amountCents - owned.hold.capturedCents - owned.hold.reservedCents;
+      if (leftAfter < DEMO_RESERVE_CENTS) {
+        throw new ServiceError(409, "demo_reserve", "In the shared demo, the last part of each budget hold is kept for the demo bot, so this one can only be declined.");
+      }
+    }
+  }
   const row = await db.transaction(async (tx) => {
     const [found] = await tx
       .select({ approval: approvals, spend: spendRequests })

@@ -86,6 +86,8 @@ export async function createHoldOrder(input: {
 
 export type PlacedHold = {
   authorizationId: string;
+  // CREATED, PARTIALLY_CAPTURED, CAPTURED, VOIDED, DENIED, PENDING...
+  status: string;
   amountCents: number;
   payeeMerchantId: string | null;
   authorizedAt: Date | null;
@@ -100,6 +102,7 @@ function placedHoldOf(order: Order): PlacedHold | null {
   if (auth.amount.currencyCode !== "USD") throw new Error("Unexpected currency on hold");
   return {
     authorizationId: auth.id,
+    status: auth.status ?? "UNKNOWN",
     amountCents: payPalToCents(auth.amount.value),
     payeeMerchantId: unit?.payee?.merchantId ?? null,
     authorizedAt: auth.createTime ? new Date(auth.createTime) : null,
@@ -122,6 +125,42 @@ export async function authorizeOrder(orderId: string): Promise<PlacedHold> {
   const placed = placedHoldOf(order);
   if (!placed) throw new Error("PayPal returned no authorization");
   return placed;
+}
+
+// Every capture on a hold's order, as PayPal records it. Each carries our
+// purchase ID in invoice_id, so this is the independent check of what was
+// really paid (and whether a payment we lost track of went through).
+export type PayPalCapture = { id: string; invoiceId: string | null; status: string; amountCents: number };
+export async function capturesOnOrder(orderId: string): Promise<PayPalCapture[]> {
+  const order = await call("get order", () => orders().getOrder({ id: orderId }));
+  return (order.purchaseUnits?.[0]?.payments?.captures ?? [])
+    .filter((c) => c.id && c.amount)
+    .map((c) => ({ id: c.id!, invoiceId: c.invoiceId ?? null, status: c.status ?? "UNKNOWN", amountCents: payPalToCents(c.amount!.value) }));
+}
+
+// A capture that counts as money taken (refunds come back separately).
+export const COUNTED_CAPTURE = new Set(["COMPLETED", "PENDING", "PARTIALLY_REFUNDED", "REFUNDED"]);
+
+export async function authorizationStatus(authorizationId: string): Promise<string> {
+  const auth = await call("get authorization", () => payments().getAuthorizedPayment({ authorizationId }));
+  return auth.status ?? "UNKNOWN";
+}
+
+// Releases what is left of a hold. A refusal is only taken as "already
+// released" once PayPal confirms the authorization is no longer live.
+export async function releaseHold(input: { authorizationId: string; storeMerchantId: string }): Promise<"released" | "failed"> {
+  try {
+    await voidHold(input);
+    return "released";
+  } catch (e) {
+    if (!(e instanceof PayPalError && e.status === 422)) return "failed";
+    try {
+      const status = await authorizationStatus(input.authorizationId);
+      return ["VOIDED", "CAPTURED", "DENIED", "EXPIRED"].includes(status) ? "released" : "failed";
+    } catch {
+      return "failed";
+    }
+  }
 }
 
 // One agent purchase. requestId is derived from the spend request, so a retry

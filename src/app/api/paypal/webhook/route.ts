@@ -1,4 +1,4 @@
-import { problem, rateLimit, tooMany } from "@/lib/api";
+import { problem, rateLimit, tooMany, clientIp } from "@/lib/api";
 import { verifyWebhookSignature } from "@/lib/paypal/webhooks";
 import { processPayPalEvent, type PayPalEvent } from "@/lib/services/webhooks";
 
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   // the one our host's proxy adds (earlier entries are whatever the client
   // sent). Signatures are checked locally, so junk never costs a PayPal call.
   // PayPal's own traffic is far below this; a 429 only makes it deliver later.
-  const ip = request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() || "local";
+  const ip = clientIp(request.headers);
   const perAddress = rateLimit(`paypal-webhook:${ip}`, 120, 60_000);
   if (!perAddress.ok) return tooMany(perAddress.retryAfter);
 

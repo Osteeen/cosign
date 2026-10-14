@@ -23,7 +23,7 @@ public sealed class FindProductsError : ApiError
     private static Task<FindProductsError> Create(FailedResponse response) =>
         response.StatusCode switch
         {
-            400 or 401 or 429 or 500 => response.Json<Problem>().As(AsProblem),
+            400 or 401 or 403 or 429 or 500 => response.Json<Problem>().As(AsProblem),
             _ => response.RawBody().As(AsFallback)
         };
 

@@ -257,6 +257,9 @@ export const holds = pgTable(
     expiresAt: ts("expires_at"),
     createdAt: createdAt(),
     releasedAt: ts("released_at"),
+    // Set when PayPal's own record of this hold disagrees with Cosign's (the
+    // daily reconciliation). Nothing can spend from a frozen hold.
+    frozenAt: ts("frozen_at"),
   },
   (t) => [
     index("holds_owner_idx").on(t.ownerId),
@@ -302,6 +305,9 @@ export const spendRequests = pgTable(
     // goes to the same one with the same PayPal-Request-Id, so a reauthorization
     // in between can never turn a retry into a second charge.
     captureAuthorizationId: text("capture_authorization_id"),
+    // One capture attempt at a time: whoever sets this (while it is null or
+    // past) talks to PayPal; anyone else leaves the purchase alone.
+    captureLeaseUntil: ts("capture_lease_until"),
     // Channel3 market price check, run when the request waits for the owner.
     // { status, items: [{ name, verdict, note, offers: [{ domain, price, title }] }], checked_at }
     marketCheck: jsonb("market_check"),

@@ -5,7 +5,7 @@
 // original (PayPal refuses to void a reauthorized ID).
 
 import "server-only";
-import { and, eq, gt, isNull, lte } from "drizzle-orm";
+import { and, eq, gt, gte, isNull, lte } from "drizzle-orm";
 import { db } from "@/db/client";
 import { holds, slips, stores } from "@/db/schema";
 import { reauthorizeHold } from "@/lib/paypal/holds";
@@ -61,6 +61,11 @@ export async function authorizationForCapture(holdId: string, now = new Date()):
         .where(eq(holds.id, hold.id));
     } else {
       console.error(`[reauth] could not renew hold ${hold.id} (${e instanceof PayPalError ? `${e.status} ${e.issue ?? ""}` : e instanceof Error ? e.name : "error"})`);
+      // A definite refusal (e.g. PayPal allows only so many renewals): don't
+      // ask again on every purchase; captures go to the current ID meanwhile.
+      if (e instanceof PayPalError && e.definite) {
+        await db.update(holds).set({ honorPeriodEndsAt: new Date(now.getTime() + 24 * 3_600_000) }).where(eq(holds.id, hold.id));
+      }
     }
     return current;
   }
@@ -68,10 +73,22 @@ export async function authorizationForCapture(holdId: string, now = new Date()):
 
 // Daily: renew every live hold past its honor period, so agents rarely wait.
 export async function reauthorizeDueHolds(now = new Date()): Promise<number> {
+  // Only holds a live slip can still spend from: this period's or an approved
+  // renewal. A closed slip's hold is released instead, never renewed.
   const due = await db
     .select({ id: holds.id })
     .from(holds)
-    .where(and(eq(holds.status, "ACTIVE"), lte(holds.honorPeriodEndsAt, now), gt(holds.expiresAt, now)));
+    .innerJoin(slips, eq(slips.id, holds.slipId))
+    .where(
+      and(
+        eq(holds.status, "ACTIVE"),
+        isNull(holds.frozenAt),
+        eq(slips.status, "ACTIVE"),
+        gte(holds.periodIndex, slips.currentPeriodIndex),
+        lte(holds.honorPeriodEndsAt, now),
+        gt(holds.expiresAt, now),
+      ),
+    );
   let renewed = 0;
   for (const h of due) {
     const [before] = await db

@@ -27,13 +27,16 @@ import { previewRules } from "./spend";
 const SEARCHES_PER_HOUR = 30;
 const usd = (amount_cents: number) => ({ amount_cents, currency: "USD" as const });
 
-export async function findProducts(agent: { id: string; status: string }, query: string, limit: number) {
+export async function findProducts(agent: { id: string; status: string; ownerId: string }, query: string, limit: number) {
+  // Searches cost Channel3 and AI calls: only for agents that can spend.
+  if (agent.status !== "ACTIVE") throw new ServiceError(403, "agent_not_active", "This agent is paused, so it can't search for products.");
   const q = query.trim().replace(/\s+/g, " ");
   if (q.length < 2 || q.length > 120) throw new ServiceError(400, "invalid_request", "query must be 2 to 120 characters.");
   const wanted = queryWords(q);
   if (wanted.length === 0) throw new ServiceError(400, "invalid_request", "query needs at least one word of 3 or more letters.");
   // Each search calls Channel3; keep it to a reasonable pace per agent.
-  if (!rateLimit(`find-products:${agent.id}`, SEARCHES_PER_HOUR, 3_600_000).ok) {
+  // Per agent, and per owner (an owner's agents share one allowance).
+  if (!rateLimit(`find-products:${agent.id}`, SEARCHES_PER_HOUR, 3_600_000).ok || !rateLimit(`find-products-owner:${agent.ownerId}`, SEARCHES_PER_HOUR * 2, 3_600_000).ok) {
     throw new ServiceError(429, "rate_limited", `Up to ${SEARCHES_PER_HOUR} product searches per hour. Try again later.`);
   }
 
@@ -68,7 +71,8 @@ export async function findProducts(agent: { id: string; status: string }, query:
 
   const [previews, market] = await Promise.all([
     Promise.all(top.map((m) => previewRules(agent.id, m.storeId, { name: m.product.name, category: m.product.category, unitAmountCents: m.product.priceCents }))),
-    searchMarket(marketQuery, 8),
+    // No store this agent can pay: nothing to compare, so no Channel3 call.
+    payable.length ? searchMarket(marketQuery, 8) : Promise.resolve(null),
   ]);
   // AI (Claude Haiku) keeps only listings that are really the same kind of
   // product and size, and says how the best match's price compares. Without

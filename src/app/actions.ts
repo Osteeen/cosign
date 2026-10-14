@@ -15,7 +15,7 @@ import { DEMO_OWNER_ID, DEMO_SESSION_HOURS, demoEnabled, isDemoOwner } from "@/l
 import { parseDollars } from "@/lib/money";
 import { requireOwner } from "@/lib/owner";
 import { draftSlip, type SlipDraft } from "@/lib/ai/draft-slip";
-import { rateLimit } from "@/lib/api";
+import { rateLimit, clientIp } from "@/lib/api";
 import { listSpending, type SpendingRow } from "@/lib/services/overview";
 import { createAgent, getAgent, revokeAgent, setAgentPaused } from "@/lib/services/agents";
 import { listStores } from "@/lib/services/stores";
@@ -47,7 +47,15 @@ export async function createAgentAction(_prev: NewAgentState, form: FormData): P
   const description = str(form, "description");
   if (name.length < 1 || name.length > 80) return { status: "error", message: "Give the agent a name of up to 80 characters." };
   if (description.length > 280) return { status: "error", message: "Keep the description under 280 characters." };
-  const { agent, keyId, secret } = await createAgent(owner.id, { name, description: description || null });
+  if (!rateLimit(`create-agent:${owner.id}`, 10, 60 * 60_000).ok) return { status: "error", message: "That's a lot of new agents at once. Try again in an hour." };
+  let created;
+  try {
+    created = await createAgent(owner.id, { name, description: description || null });
+  } catch (e) {
+    if (e instanceof ServiceError) return { status: "error", message: e.message };
+    throw e;
+  }
+  const { agent, keyId, secret } = created;
   revalidatePath("/");
   // Returned to this page only, shown once, never stored in plain text.
   return { status: "created", agentId: agent.id, agentName: agent.name, keyId, secret };
@@ -236,7 +244,7 @@ export async function spendingRowsAction(): Promise<SpendingRow[]> {
 export async function demoSignInAction() {
   if (!demoEnabled()) redirect("/sign-in");
   const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const ip = clientIp(h);
   if (!rateLimit(`demo-signin:${ip}`, 10, 60 * 60_000).ok) redirect("/sign-in?error=slow");
   const [demo] = await db.select({ id: users.id }).from(users).where(eq(users.id, DEMO_OWNER_ID));
   if (!demo) redirect("/sign-in?error=demo");

@@ -1,10 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/db/client";
 import { agents } from "@/db/schema";
-import { problem, rateLimit, tooMany } from "@/lib/api";
+import { problem, rateLimit, tooMany, clientIp } from "@/lib/api";
 import { DEMO_OWNER_ID, demoEnabled, isDemoOwner } from "@/lib/demo/account";
 import { runDemoBot } from "@/lib/demo/bot";
+import { setAgentPaused } from "@/lib/services/agents";
 
 // Runs the demo procurement bot for the shared demo account and streams its
 // steps as newline-delimited JSON. Demo account only; rate-limited because each
@@ -14,17 +15,24 @@ export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id || !isDemoOwner(session.user.id)) return problem(403, "forbidden", "The demo bot runs in the demo account only.");
 
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const ip = clientIp(request.headers);
   const perVisitor = rateLimit(`demo-bot:${ip}`, 2, 60_000);
   if (!perVisitor.ok) return tooMany(perVisitor.retryAfter);
   const overall = rateLimit("demo-bot:all", 30, 60 * 60_000);
   if (!overall.ok) return tooMany(overall.retryAfter);
 
-  const [agent] = await db
+  // The seeded bot: the oldest one with this name (a visitor may add a namesake).
+  const [seeded] = await db
     .select()
     .from(agents)
-    .where(and(eq(agents.ownerId, DEMO_OWNER_ID), eq(agents.name, "Office procurement bot"), eq(agents.status, "ACTIVE")));
-  if (!agent) return problem(409, "no_demo_agent", "The demo agent is not set up.");
+    .where(and(eq(agents.ownerId, DEMO_OWNER_ID), eq(agents.name, "Office procurement bot"), ne(agents.status, "REVOKED")))
+    .orderBy(asc(agents.createdAt))
+    .limit(1);
+  if (!seeded) return problem(409, "no_demo_agent", "The demo agent is not set up.");
+  // The account is shared: if an earlier visitor paused the bot, a run resumes
+  // it, so the next visitor never finds the demo broken.
+  if (seeded.status === "PAUSED") await setAgentPaused(DEMO_OWNER_ID, seeded.id, false);
+  const agent = { ...seeded, status: "ACTIVE" };
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

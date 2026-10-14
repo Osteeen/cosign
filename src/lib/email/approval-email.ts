@@ -3,6 +3,7 @@
 
 import { formatUsd } from "../money.ts";
 import { emailLayout } from "./layout.ts";
+import { withoutLinks } from "@/lib/ai/untrusted";
 
 export function approvalEmail(input: {
   agentName: string;
@@ -17,7 +18,9 @@ export function approvalEmail(input: {
   url: string;
 }) {
   const amount = formatUsd(input.totalCents);
-  const what = input.items.map((i) => `${i.quantity} x ${i.name}`).join(", ");
+  // Agent-written text: links removed, so the email can't carry a phishing link.
+  const what = withoutLinks(input.items.map((i) => `${i.quantity} x ${i.name}`).join(", "));
+  const purpose = withoutLinks(input.purpose);
   const expires = input.expiresAt.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
   const flagged = input.reasons.some((r) => r.code === "INTENT_FLAGGED");
   const why = input.reasons.map((r) => r.message).join(" ");
@@ -29,7 +32,7 @@ export function approvalEmail(input: {
     "",
     `What: ${what}`,
     `Why Cosign is asking: ${flagged ? "Flagged by purchase check. " : ""}${why}`,
-    `The agent said: "${input.purpose}"`,
+    `The agent said: "${purpose}"`,
     ...(input.market ? [`Market (Channel3): ${input.market}`] : []),
     `Decide by: ${expires}`,
     "",
@@ -49,7 +52,7 @@ export function approvalEmail(input: {
       ["Store", `${input.storeName} (demo store)`],
       ["What", what],
       ["Why asking", why],
-      ["Agent said", `"${input.purpose}"`],
+      ["Agent said", `"${purpose}"`],
       ...(input.market ? ([["Market", `${input.market} (Channel3)`]] as [string, string][]) : []),
       ["Decide by", expires],
     ],

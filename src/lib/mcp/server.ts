@@ -7,8 +7,9 @@
 // including the purpose text - can loosen a decision.
 
 import "server-only";
-import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { rateLimit } from "@/lib/api";
 import { z } from "zod";
 import { formatUsd } from "@/lib/money";
 import { getAllowance } from "@/lib/services/allowance";
@@ -18,7 +19,7 @@ import { ServiceError } from "@/lib/services/common";
 import { CATEGORIES } from "@/lib/services/slips";
 import { createSpendRequest, getSpendRequestForAgent, listSpendRequestsForAgent, toApi } from "@/lib/services/spend";
 
-type Agent = { id: string; name: string; status: string };
+type Agent = { id: string; name: string; status: string; ownerId: string };
 
 const text = (s: string) => ({ type: "text" as const, text: s });
 
@@ -140,14 +141,27 @@ export function buildCosignMcpServer(agent: Agent): McpServer {
           .min(1)
           .max(50),
         purpose: z.string().min(3).max(500).describe("One line on why, in the user's terms"),
-        idempotency_key: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/).optional().describe("Reuse to retry the same purchase safely; leave out for a new purchase"),
+        idempotency_key: z
+          .string()
+          .regex(/^[A-Za-z0-9_-]{16,64}$/)
+          .optional()
+          .describe("Reuse to retry the same purchase safely. If left out, the same cart asked again within 10 minutes counts as the same purchase; send a new key to buy the same cart twice on purpose."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async (args) => {
       try {
+        // Same limit as the REST API's purchases.
+        if (!rateLimit(`spend:${agent.id}`, 30, 60_000).ok) return fail(new ServiceError(429, "rate_limited", "Too many purchase requests. Try again in a minute."));
         const total = args.items.reduce((sum, i) => sum + i.quantity * i.unit_price_cents, 0);
-        const { row } = await createSpendRequest(agent.id, args.idempotency_key ?? `mcp-${randomUUID()}`, {
+        // No key given: an assistant retrying a timed-out call must not buy twice.
+        const key =
+          args.idempotency_key ??
+          `mcp-${createHash("sha256")
+            .update(JSON.stringify({ store: args.store_id, items: args.items, purpose: args.purpose, window: Math.floor(Date.now() / 600_000) }))
+            .digest("hex")
+            .slice(0, 40)}`;
+        const { row } = await createSpendRequest(agent.id, key, {
           store_id: args.store_id,
           items: args.items.map((i) => ({ name: i.name, category: i.category, quantity: i.quantity, unit_amount_cents: i.unit_price_cents })),
           total: { amount_cents: total, currency: "USD" },

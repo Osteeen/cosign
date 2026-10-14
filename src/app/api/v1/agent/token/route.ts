@@ -2,12 +2,12 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { agentKeys, agents } from "@/db/schema";
 import { issueToken, parseBasic, secretMatches, TOKEN_TTL_SECONDS } from "@/lib/agent-auth";
-import { fromError, json, problem, rateLimit, tooMany } from "@/lib/api";
+import { fromError, json, problem, rateLimit, tooMany, clientIp } from "@/lib/api";
 
 // Exchange an agent API key (HTTP Basic key_id:secret) for a 15-minute token.
 export async function POST(request: Request) {
   try {
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+    const ip = clientIp(request.headers);
     const creds = parseBasic(request.headers.get("authorization"));
     const limited = rateLimit(`token:${ip}:${creds?.keyId ?? "none"}`, 10, 60_000);
     if (!limited.ok) return tooMany(limited.retryAfter);

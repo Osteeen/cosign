@@ -46,7 +46,7 @@ export async function getAllowance(agent: { id: string; status: string }) {
       expires_at: slip.expiresAt?.toISOString() ?? null,
       ships_to: shipTo?.label ?? null,
       stores: periodHolds
-        .filter((h) => h.hold.status === "ACTIVE")
+        .filter((h) => h.hold.status === "ACTIVE" && !h.hold.frozenAt && (!h.hold.expiresAt || h.hold.expiresAt > new Date()))
         .map((h) => ({
           store: { id: h.hold.storeId, name: h.storeName, categories: h.storeCategories, website: absolute(h.storeWebsite) },
           remaining_in_hold: usd(h.hold.amountCents - h.hold.capturedCents - h.hold.reservedCents),

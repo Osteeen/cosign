@@ -14,7 +14,7 @@ Accessor: `client.products` · Source: `src/resources/products.ts` · 1 operatio
 - **Request body**: none — no `Content-Type` header is sent
 - **Returns**: `ProductSearch`
 - **Error**: `CosignAgentApiError` with `kind: "api"`, an instance of `Products.FindProductsError` — **typed arms**, narrowed on `err.payload.kind`
-- **Error arms**: `"problem"` [400] `Problem` · `"problem2"` [401] `Problem` · `"problem3"` [429] `Problem` · `"problem4"` [500] `Problem` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
+- **Error arms**: `"problem"` [400] `Problem` · `"problem2"` [401] `Problem` · `"problem3"` [403] `Problem` · `"problem4"` [429] `Problem` · `"problem5"` [500] `Problem` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
 
 **Fields** — `Products.FindProductsRequest` (2):
 

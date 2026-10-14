@@ -9,8 +9,15 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "./db/client.ts";
 import { accounts, sessions, users, verificationTokens } from "./db/schema.ts";
 import { signInEmail } from "./lib/email/sign-in-email.ts";
+import { rateLimit } from "./lib/api.ts";
 
 const LINK_LIFETIME_SECONDS = 15 * 60;
+
+// Sign-in links are built from AUTH_URL. Without it (with AUTH_TRUST_HOST on),
+// a forged Host header could point a victim's link at someone else's site.
+if (process.env.NODE_ENV === "production" && !process.env.AUTH_URL) {
+  throw new Error("AUTH_URL must be set in production");
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db, {
@@ -35,6 +42,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       from: process.env.AUTH_EMAIL_FROM || "Cosign <onboarding@resend.dev>",
       maxAge: LINK_LIFETIME_SECONDS,
       async sendVerificationRequest({ identifier: to, url, provider }) {
+        // Enforced here too, not only on our sign-in form: Auth.js's own
+        // sign-in endpoint reaches this function directly.
+        const perEmail = rateLimit(`signin-email-send:${to.toLowerCase()}`, 3, 15 * 60_000);
+        const overall = rateLimit("signin-email-send:all", 100, 60 * 60_000);
+        if (!perEmail.ok || !overall.ok) throw new Error("Too many sign-in emails");
         const apiKey = provider.apiKey;
         if (!apiKey) {
           // Local development only: no email service, so print the link.

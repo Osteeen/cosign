@@ -9,13 +9,25 @@ import { activityEvents, agents, approvals, holds, slips, users } from "@/db/sch
 import { renewalEmail } from "@/lib/email/renewal-email";
 import { sendEmail } from "@/lib/email/send";
 import { addDays, appUrl, logActivity } from "./common";
-import { recoverWaitingHolds, renewalState, RENEWAL_WINDOW_DAYS, rollOverIfDue } from "./slips";
+import { recoverWaitingHolds, releaseLeftoverHolds, renewalState, RENEWAL_WINDOW_DAYS, rollOverIfDue } from "./slips";
 import { reauthorizeDueHolds } from "./reauth";
-import { isDemoOwner } from "@/lib/demo/account";
-import { expireApprovals } from "./spend";
+import { demoEnabled, isDemoOwner } from "@/lib/demo/account";
+import { cleanUpDemoAgents } from "./agents";
+import { expireApprovals, reconcileHolds, resumeStuckPurchases } from "./spend";
 
 export async function runDailyJob(now = new Date()) {
-  const result = { rolledOver: 0, remindersSent: 0, reminderFailures: 0, ownersCheckedForApprovals: 0, holdsRenewed: 0, holdsRecovered: 0 };
+  const result = {
+    rolledOver: 0,
+    remindersSent: 0,
+    reminderFailures: 0,
+    ownersCheckedForApprovals: 0,
+    holdsRenewed: 0,
+    holdsRecovered: 0,
+    purchasesRetried: 0,
+    holdsReleased: 0,
+    reconciliation: { checked: 0, corrected: 0, frozen: 0 },
+    demoAgentsCleared: 0,
+  };
 
   // 1. Periods that have ended: switch to renewed holds, or expire.
   const ended = await db
@@ -86,5 +98,17 @@ export async function runDailyJob(now = new Date()) {
 
   // 5. Holds PayPal placed whose answer never reached Cosign: record or release.
   result.holdsRecovered = await recoverWaitingHolds(now);
+
+  // 6. Purchases whose PayPal answer was lost and nobody asked again: retry.
+  result.purchasesRetried = await resumeStuckPurchases();
+
+  // 7. Holds that should no longer be live at PayPal (an earlier release failed).
+  result.holdsReleased = await releaseLeftoverHolds();
+
+  // 8. Each live hold against PayPal's own list of captures (freezes on mismatch).
+  result.reconciliation = await reconcileHolds();
+
+  // 9. The shared demo account: clear agents visitors added more than a day ago.
+  if (demoEnabled()) result.demoAgentsCleared = await cleanUpDemoAgents(now);
   return result;
 }

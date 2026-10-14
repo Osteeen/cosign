@@ -9,6 +9,7 @@
 
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { aimedAtAi, dataJson } from "./untrusted";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { IntentResult } from "@/lib/rules/types";
@@ -48,6 +49,10 @@ export async function checkIntent(input: {
   totalCents: number;
   purpose: string;
 }): Promise<IntentResult> {
+  // Plain instructions aimed at an AI: always the owner's call, no model needed.
+  const aimed = aimedAtAi([input.purpose, ...input.items.map((i) => i.name)]);
+  if (aimed) return { verdict: "FLAGGED", summary: `The agent's text contains an instruction aimed at an AI ("${aimed}"), a sign it was manipulated, for example by a web page.` };
+
   if (!process.env.ANTHROPIC_API_KEY) {
     // Not configured: in production that is unsafe, so ask the owner; locally, skip.
     return process.env.NODE_ENV === "production"
@@ -56,14 +61,13 @@ export async function checkIntent(input: {
   }
 
   // JSON keeps the untrusted strings quoted and escaped inside the data block.
-  const purchase = JSON.stringify(
+  const purchase = dataJson(
     {
       store: input.storeName,
       items: input.items.map((i) => ({ name: i.name, category: i.category, quantity: i.quantity, unit_price: formatUsd(i.unitAmountCents) })),
       total: formatUsd(input.totalCents),
       agent_purpose: input.purpose,
     },
-    null,
     2,
   );
 
@@ -75,7 +79,7 @@ export async function checkIntent(input: {
       messages: [
         {
           role: "user",
-          content: `The owner's words on the permission slip: ${JSON.stringify(input.ownerWords)}
+          content: `The owner's words on the permission slip: ${dataJson(input.ownerWords)}
 Allowed categories: ${input.categories.join(", ")}
 
 <purchase>

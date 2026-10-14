@@ -16,7 +16,7 @@ Each `###` block is one operation and assumes `sdk-map.md` is loaded: blocks omi
 - **Returns (parsed)**: `ProductSearch`
 - **Returns (raw)**: `ApiResult[ProductSearch, FindProductsErrorBody]`
 - **Error**: `FindProductsErrorBody` — **Case A (typed)**
-- **Error arms**: `Problem` [400, 401, 429, 500] · `RawError` [anything unmapped]
+- **Error arms**: `Problem` [400, 401, 403, 429, 500] · `RawError` [anything unmapped]
 
 | Type | Source |
 | --- | --- |

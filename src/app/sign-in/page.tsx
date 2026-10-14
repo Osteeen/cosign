@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { auth, signIn } from "@/auth";
-import { rateLimit } from "@/lib/api";
+import { rateLimit, clientIp } from "@/lib/api";
 import { SubmitButton } from "@/components/submit-button";
 import { Topbar } from "@/components/topbar";
 import { DemoButton } from "@/components/demo-button";
@@ -22,7 +22,7 @@ async function sendLink(formData: FormData) {
   const next = safeNext(formData.get("next"));
   if (!parsed.success) redirect(`/sign-in?error=email&next=${encodeURIComponent(next)}`);
   // Stop sign-in email floods: per address (someone else's inbox) and per sender.
-  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const ip = clientIp(await headers());
   const perEmail = rateLimit(`signin-email:${parsed.data}`, 3, 15 * 60_000);
   const perIp = rateLimit(`signin-ip:${ip}`, 10, 60 * 60_000);
   if (!perEmail.ok || !perIp.ok) redirect(`/sign-in?error=slow&next=${encodeURIComponent(next)}`);

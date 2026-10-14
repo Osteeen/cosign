@@ -14,7 +14,7 @@ Accessor: `client.Products` · Source: `src/CosignAgentApi/Api/Products.cs` · 1
 - **Query params (wire ← C#)**: `q` ← `Q`, `limit` ← `Limit`
 - **Returns**: `ProductSearch`
 - **Error**: `ApiException<FindProductsError>` — **Case A (typed)**
-- **Error accessors**: `TryGetProblem(out Problem)` [400, 401, 429, 500] · `TryGetRawError(out RawError)` [fallback]
+- **Error accessors**: `TryGetProblem(out Problem)` [400, 401, 403, 429, 500] · `TryGetRawError(out RawError)` [fallback]
 
 | Type | Source |
 | --- | --- |

@@ -5,6 +5,7 @@
 
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { dataJson } from "./untrusted";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { MarketOffer } from "@/lib/market/channel3";
@@ -36,8 +37,8 @@ export async function judgeMarket(item: { name: string; quantity: number; unitAm
       messages: [
         {
           role: "user",
-          content: `<item>${JSON.stringify({ name: item.name, quantity: item.quantity, unit_price: formatUsd(item.unitAmountCents) })}</item>
-<listings>${JSON.stringify(listings.map((l, i) => ({ index: i, title: l.title, retailer: l.domain, price: `$${l.price.toFixed(2)}` })))}</listings>`,
+          content: `<item>${dataJson({ name: item.name, quantity: item.quantity, unit_price: formatUsd(item.unitAmountCents) })}</item>
+<listings>${dataJson(listings.map((l, i) => ({ index: i, title: l.title, retailer: l.domain, price: `$${l.price.toFixed(2)}` })))}</listings>`,
         },
       ],
       output_config: { format: zodOutputFormat(Judged) },

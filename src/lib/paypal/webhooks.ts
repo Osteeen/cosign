@@ -2,7 +2,8 @@
 // documented offline method): PayPal signs
 //   <transmission id>|<transmission time>|<our webhook ID>|<CRC32 of the raw body>
 // with SHA256withRSA, and names its certificate in paypal-cert-url. We fetch
-// that certificate only from a paypal.com host over https (cached), and check
+// that certificate only from PayPal's sandbox API hosts over https (cached),
+// require it to be PayPal's own (DigiCert-issued), and check
 // the signature here. No call to PayPal per delivery, so forged requests cost
 // PayPal nothing and cannot use up the shared app's quota.
 
@@ -16,15 +17,24 @@ const CERT_TTL_MS = 24 * 3_600_000;
 const MAX_CERTS = 16;
 const certs = new Map<string, { cert: X509Certificate; at: number }>();
 
-// Certificates PayPal signs with live on paypal.com hosts only.
+// PayPal's sandbox serves its signing certificates from these hosts, under
+// this path only. Anything else is refused before any fetch.
+const CERT_HOSTS = new Set(["api.sandbox.paypal.com", "api-m.sandbox.paypal.com"]);
 function allowedCertUrl(value: string): URL | null {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && /(^|\.)paypal\.com$/.test(url.hostname) && !url.username && !url.password ? url : null;
+    if (url.protocol !== "https:" || !CERT_HOSTS.has(url.hostname) || url.username || url.password || url.port) return null;
+    if (!/^\/v1\/notifications\/certs\/[A-Za-z0-9-]{1,100}$/.test(url.pathname)) return null;
+    // The query string is not part of a certificate's address (and can't be used to force fetches).
+    return new URL(`${url.origin}${url.pathname}`);
   } catch {
     return null;
   }
 }
+
+// The certificate must be PayPal's own, issued by DigiCert.
+const isPayPalCert = (cert: X509Certificate) =>
+  /O=PayPal\\?, Inc\./.test(cert.subject) && /CN=[a-z0-9.-]*paypal\.com$/m.test(cert.subject) && /O=DigiCert Inc/.test(cert.issuer);
 
 async function certificate(url: URL): Promise<X509Certificate | "invalid" | "unavailable"> {
   const hit = certs.get(url.href);
@@ -46,7 +56,7 @@ async function certificate(url: URL): Promise<X509Certificate | "invalid" | "una
     return "invalid";
   }
   const now = Date.now();
-  if (Date.parse(cert.validFrom) > now || Date.parse(cert.validTo) < now) return "invalid";
+  if (Date.parse(cert.validFrom) > now || Date.parse(cert.validTo) < now || !isPayPalCert(cert)) return "invalid";
   if (certs.size >= MAX_CERTS) certs.delete(certs.keys().next().value!);
   certs.set(url.href, { cert, at: now });
   return cert;
@@ -55,6 +65,14 @@ async function certificate(url: URL): Promise<X509Certificate | "invalid" | "una
 export async function verifyWebhookSignature(rawBody: string, headers: Headers, webhookId: string): Promise<Verification> {
   const algo = headers.get("paypal-auth-algo");
   const certUrl = allowedCertUrl(headers.get("paypal-cert-url") ?? "");
+  if (!certUrl && headers.get("paypal-cert-url")) {
+    // Host only (never the body): shows at once if PayPal moves its certificates.
+    try {
+      console.warn(`[paypal-webhook] certificate address refused: ${new URL(headers.get("paypal-cert-url")!).host}`);
+    } catch {
+      console.warn("[paypal-webhook] certificate address refused: not a URL");
+    }
+  }
   const transmissionId = headers.get("paypal-transmission-id");
   const transmissionTime = headers.get("paypal-transmission-time");
   const signature = headers.get("paypal-transmission-sig");

@@ -9,7 +9,7 @@ import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt } from "drizzle-
 import { z } from "zod";
 import { db } from "@/db/client";
 import { addresses, agents, holds, slips, slipStores, stores } from "@/db/schema";
-import { authorizeOrder, createHoldOrder, getOrder, voidHold } from "@/lib/paypal/holds";
+import { authorizeOrder, createHoldOrder, getOrder, releaseHold } from "@/lib/paypal/holds";
 import { PayPalError } from "@/lib/paypal/client";
 import type { Category } from "@/lib/rules/types";
 import { addDays, appUrl, logActivity, notFound, ServiceError, type Tx } from "./common";
@@ -279,12 +279,7 @@ export async function recoverWaitingHolds(now = new Date()): Promise<number> {
       if (order.status !== "COMPLETED" || !order.placed) continue;
       // Keep the record, then release it at PayPal.
       await db.update(holds).set({ paypalAuthorizationId: order.placed.authorizationId }).where(and(eq(holds.id, c.hold.id), isNull(holds.paypalAuthorizationId)));
-      let voided = true;
-      try {
-        await voidHold({ authorizationId: order.placed.authorizationId, storeMerchantId: c.merchantId });
-      } catch (e) {
-        voided = e instanceof PayPalError && e.status === 422;
-      }
+      const voided = (await releaseHold({ authorizationId: order.placed.authorizationId, storeMerchantId: c.merchantId })) === "released";
       await logActivity(db, {
         ownerId: c.hold.ownerId,
         agentId: c.agentId,
@@ -299,6 +294,25 @@ export async function recoverWaitingHolds(now = new Date()): Promise<number> {
     }
   }
   return recovered;
+}
+
+// Daily: holds still live at PayPal although nothing may spend from them any
+// more (their slip ended or expired, the agent was revoked, or their period
+// is over) because an earlier release failed. Try releasing them again.
+export async function releaseLeftoverHolds(): Promise<number> {
+  const leftovers = await db
+    .select({ hold: holds, agentId: slips.agentId, slipStatus: slips.status, currentPeriod: slips.currentPeriodIndex, agentStatus: agents.status })
+    .from(holds)
+    .innerJoin(slips, eq(slips.id, holds.slipId))
+    .innerJoin(agents, eq(agents.id, slips.agentId))
+    .where(eq(holds.status, "ACTIVE"))
+    .limit(500);
+  const stale = leftovers.filter(
+    (l) => !["ACTIVE", "AWAITING_HOLDS"].includes(l.slipStatus) || l.agentStatus === "REVOKED" || l.hold.periodIndex < l.currentPeriod,
+  );
+  let released = 0;
+  for (const l of stale) released += await releaseHoldsAtPayPal(l.hold.ownerId, [l.hold], l.agentId);
+  return released;
 }
 
 // The owner is back from PayPal. Only the signed-in owner's own hold can be
@@ -324,6 +338,9 @@ export async function completeHoldApproval(ownerId: string, orderId: string): Pr
   // lost). Record that authorization as it is; authorizing again could be
   // refused once PayPal forgets the request ID.
   const placed = order.status === "COMPLETED" && order.placed ? order.placed : await authorizeOrder(orderId);
+  if (!["CREATED", "PARTIALLY_CAPTURED", "PENDING"].includes(placed.status)) {
+    throw new ServiceError(409, "hold_closed", "PayPal says this budget hold is no longer live. Nothing is held.");
+  }
   if (placed.payeeMerchantId !== hold.merchantId || placed.amountCents !== hold.hold.amountCents) {
     // Should never happen: refuse to use a hold that differs from what we asked for.
     throw new ServiceError(409, "hold_mismatch", "PayPal returned a different store or amount. The hold was not used.");
@@ -366,12 +383,7 @@ export async function completeHoldApproval(ownerId: string, orderId: string): Pr
     // the owner's money would stay held at PayPal with no record here.
     const [now2] = await db.select({ authorizationId: holds.paypalAuthorizationId }).from(holds).where(eq(holds.id, hold.hold.id));
     if (now2?.authorizationId === placed.authorizationId) return { agentId: hold.agentId };
-    let voided = true;
-    try {
-      await voidHold({ authorizationId: placed.authorizationId, storeMerchantId: hold.merchantId });
-    } catch (e) {
-      voided = e instanceof PayPalError && e.status === 422; // already voided or captured
-    }
+    const voided = (await releaseHold({ authorizationId: placed.authorizationId, storeMerchantId: hold.merchantId })) === "released";
     await logActivity(db, {
       ownerId,
       agentId: hold.agentId,
@@ -442,6 +454,9 @@ export async function renewSlip(ownerId: string, slipId: string): Promise<{ agen
     if (!slip) throw notFound("Permission slip");
     if (slip.status !== "ACTIVE") throw new ServiceError(409, "slip_not_active", "Only an active slip can be renewed.");
     if (renewalState(slip).lastPeriod) throw new ServiceError(409, "slip_ends", "This slip ends with the current period, so there is nothing to renew.");
+    // A hold lasts 29 days from approval: renewing earlier would leave the next
+    // period without a usable hold before it ends.
+    if (!renewalState(slip).due) throw new ServiceError(409, "renewal_not_due", `You can renew in the last ${RENEWAL_WINDOW_DAYS} days of the period.`);
 
     const nextIndex = slip.currentPeriodIndex + 1;
     const existing = await tx
@@ -486,9 +501,14 @@ export async function rollOverIfDue(slipId: string, now = new Date()): Promise<v
 
     if (renewed) {
       const starts = slip.currentPeriodEndsAt;
+      // The period never outlives its PayPal holds (29 days from approval):
+      // end it an hour before the first one lapses, if that comes sooner.
+      const lapses = next.filter((h) => h.status === "ACTIVE" && h.expiresAt).map((h) => h.expiresAt!.getTime() - 3_600_000);
+      const full = addDays(starts, slip.periodDays);
+      const ends = new Date(Math.min(full.getTime(), ...lapses));
       await tx
         .update(slips)
-        .set({ currentPeriodIndex: slip.currentPeriodIndex + 1, currentPeriodStartsAt: starts, currentPeriodEndsAt: addDays(starts, slip.periodDays) })
+        .set({ currentPeriodIndex: slip.currentPeriodIndex + 1, currentPeriodStartsAt: starts, currentPeriodEndsAt: ends > starts ? ends : full })
         .where(eq(slips.id, slipId));
       await logActivity(tx, { ownerId: slip.ownerId, agentId: slip.agentId, type: "SLIP_RENEWED", summary: "A new budget period started" });
     } else {

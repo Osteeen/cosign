@@ -2,14 +2,14 @@
 // and scopes every query by it; another owner's agent is simply "not found".
 
 import "server-only";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { agentKeys, agents, approvals, holds, slips, spendRequests } from "@/db/schema";
+import { agentKeys, agents, approvals, holds, slips, spendRequests, users } from "@/db/schema";
 import { newAgentKey } from "@/lib/agent-auth";
-import { voidHold } from "@/lib/paypal/holds";
-import { PayPalError } from "@/lib/paypal/client";
+import { releaseHold } from "@/lib/paypal/holds";
 import { logActivity, notFound, ServiceError } from "./common";
 import { storeMerchantIds } from "./stores";
+import { DEMO_OWNER_ID, isDemoOwner } from "@/lib/demo/account";
 
 export async function listAgents(ownerId: string) {
   return db.select().from(agents).where(eq(agents.ownerId, ownerId)).orderBy(desc(agents.createdAt));
@@ -24,9 +24,46 @@ export async function getAgent(ownerId: string, agentId: string) {
   return agent;
 }
 
+// Each agent gets its own key and its own limits, so the number of agents an
+// owner can hold (and add per hour) is capped too.
+export const MAX_AGENTS_PER_OWNER = 20;
+const DEMO_MAX_AGENTS = 8;
+// The demo's own agents (created by the seed); everything else a visitor added.
+const DEMO_SEEDED = ["Office procurement bot", "Travel booker"];
+
+// Daily: agents visitors added to the shared demo account are revoked after a
+// day, so names typed by one visitor don't stay in front of every other one.
+// The seeded agents (the oldest of each name) are always kept.
+export async function cleanUpDemoAgents(now = new Date()): Promise<number> {
+  const all = await db.select().from(agents).where(and(eq(agents.ownerId, DEMO_OWNER_ID), ne(agents.status, "REVOKED"))).orderBy(asc(agents.createdAt));
+  const kept = new Set<string>();
+  let revoked = 0;
+  for (const a of all) {
+    if (DEMO_SEEDED.includes(a.name) && !kept.has(a.name)) {
+      kept.add(a.name);
+      continue;
+    }
+    if (now.getTime() - a.createdAt.getTime() < 86_400_000) continue;
+    await revokeAgent(DEMO_OWNER_ID, a.id);
+    revoked++;
+  }
+  return revoked;
+}
+
 export async function createAgent(ownerId: string, input: { name: string; description: string | null }) {
   const key = newAgentKey();
   return db.transaction(async (tx) => {
+    // Serialise this owner's additions so the cap can't be raced.
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, ownerId)).for("update");
+    const [count] = await tx.select({ n: sql<number>`count(*)::int` }).from(agents).where(and(eq(agents.ownerId, ownerId), ne(agents.status, "REVOKED")));
+    const max = isDemoOwner(ownerId) ? DEMO_MAX_AGENTS : MAX_AGENTS_PER_OWNER;
+    if ((count?.n ?? 0) >= max) {
+      throw new ServiceError(
+        422,
+        "too_many_agents",
+        isDemoOwner(ownerId) ? "The shared demo has enough agents for now; visitors' agents are cleared daily." : `You can have up to ${max} agents. Revoke one you no longer use first.`,
+      );
+    }
     const [agent] = await tx.insert(agents).values({ ownerId, name: input.name, description: input.description }).returning();
     if (!agent) throw new Error("agent insert failed");
     await tx.insert(agentKeys).values({ id: key.keyId, agentId: agent.id, ownerId, secretHash: key.secretHash });
@@ -114,20 +151,18 @@ export async function releaseHoldsAtPayPal(
   for (const hold of activeHolds) {
     const merchantId = merchants.get(hold.storeId);
     if (!hold.paypalAuthorizationId || !merchantId) continue;
-    try {
-      await voidHold({ authorizationId: hold.paypalAuthorizationId, storeMerchantId: merchantId });
-    } catch (e) {
-      // Already voided or fully captured: nothing left to release.
-      if (!(e instanceof PayPalError && e.status === 422)) {
-        await logActivity(db, {
-          ownerId,
-          agentId,
-          type: "HOLD_RELEASE_FAILED",
-          summary: "PayPal did not release a hold; it will expire on its own",
-          data: { holdId: hold.id, issue: e instanceof PayPalError ? e.issue : "error" },
-        });
-        continue;
-      }
+    // Released, or confirmed no longer live at PayPal (voided, captured...).
+    if ((await releaseHold({ authorizationId: hold.paypalAuthorizationId, storeMerchantId: merchantId })) === "failed") {
+      // Stays ACTIVE in Cosign (its slip is closed, so nothing can spend from
+      // it); the daily job tries the release again.
+      await logActivity(db, {
+        ownerId,
+        agentId,
+        type: "HOLD_RELEASE_FAILED",
+        summary: "PayPal did not release a hold yet; Cosign will try again daily",
+        data: { holdId: hold.id },
+      });
+      continue;
     }
     await db
       .update(holds)

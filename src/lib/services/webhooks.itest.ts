@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { activityEvents, agents, holds, slipStores, slips, spendRequests, stores, users } from "@/db/schema";
+import { activityEvents, agents, holds, orders, slipStores, slips, spendRequests, stores, users } from "@/db/schema";
+import { previewRules } from "./spend";
 import { processPayPalEvent } from "./webhooks";
 
 const HASH = "b".repeat(64);
@@ -127,21 +128,42 @@ describe("PayPal webhook events", () => {
     assert.equal((await holdOf(f.holdId)).capturedCents, TOTAL);
   });
 
-  it("does not settle when PayPal's amount differs, and flags it for the owner", async () => {
+  it("does not settle when PayPal's amount differs, and freezes the hold for the owner", async () => {
     const f = await fixture("PROCESSING");
     const r = await processPayPalEvent(event("PAYMENT.CAPTURE.COMPLETED", { id: f.captureId, invoice_id: f.spendId, amount: usd(TOTAL + 1) }));
     assert.equal(r.outcome, "flagged_amount_mismatch");
     assert.equal((await spendOf(f.spendId)).status, "PROCESSING");
     assert.equal(await flags(f.ownerId), 1);
+    assert.ok((await holdOf(f.holdId)).frozenAt);
   });
 
-  it("flags a payment PayPal completed that Cosign recorded as failed", async () => {
+  it("counts a payment PayPal completed that Cosign recorded as failed, and tells the owner", async () => {
     const f = await fixture("PROCESSING");
+    // As after a failure: the reservation was released, nothing counted as spent.
     await db.update(spendRequests).set({ status: "PAYMENT_FAILED" }).where(eq(spendRequests.id, f.spendId));
+    await db.update(holds).set({ reservedCents: 0 }).where(eq(holds.id, f.holdId));
     const r = await processPayPalEvent(event("PAYMENT.CAPTURE.COMPLETED", { id: f.captureId, invoice_id: f.spendId, amount: usd(TOTAL) }));
-    assert.equal(r.outcome, "flagged_payment_failed");
-    assert.equal((await spendOf(f.spendId)).status, "PAYMENT_FAILED");
+    assert.equal(r.outcome, "corrected_payment_failed");
+    const spend = await spendOf(f.spendId);
+    assert.equal(spend.status, "COMPLETED");
+    assert.equal(spend.paypalCaptureId, f.captureId);
+    const hold = await holdOf(f.holdId);
+    assert.equal(hold.capturedCents, TOTAL);
+    assert.equal(hold.reservedCents, 0);
     assert.equal(await flags(f.ownerId), 1);
+    const [order] = await db.select().from(orders).where(eq(orders.spendRequestId, f.spendId));
+    assert.ok(order);
+  });
+
+  it("freezes a hold when PayPal reports a payment Cosign can't match, and nothing can spend from it", async () => {
+    const f = await fixture("COMPLETED");
+    const r = await processPayPalEvent(event("PAYMENT.CAPTURE.COMPLETED", { id: `CAPOTHER${randomUUID().slice(0, 8).toUpperCase()}`, invoice_id: f.spendId, amount: usd(TOTAL) }));
+    assert.equal(r.outcome, "flagged_second_capture");
+    assert.ok((await holdOf(f.holdId)).frozenAt);
+    const [row] = await db.select({ agentId: spendRequests.agentId, storeId: spendRequests.storeId }).from(spendRequests).where(eq(spendRequests.id, f.spendId));
+    const preview = await previewRules(row!.agentId, row!.storeId, { name: "Paper", category: "office_supplies", unitAmountCents: 100 });
+    assert.equal(preview.outcome, "DENY");
+    assert.ok(preview.reasons.some((x) => x.code === "NO_ACTIVE_HOLD"));
   });
 
   it("ignores a capture from an authorization that is not this hold's", async () => {

@@ -26,6 +26,12 @@ export function fromError(e: unknown): Response {
 export const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
+// The caller's address for rate limits: the LAST x-forwarded-for entry, the
+// one our host's proxy appends. Earlier entries are whatever the client sent.
+export function clientIp(headers: Headers): string {
+  return headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() || "local";
+}
+
 // Fixed-window limiter, per process. Enough for one app instance; a shared
 // store would be needed for several.
 const windows = new Map<string, { start: number; count: number }>();
