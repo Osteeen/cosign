@@ -85,7 +85,7 @@ Mapped in first-match order -- an earlier row wins over a later range that also 
 
 | Status | `error` is |
 | --- | --- |
-| 401, 500 | <code>[RawError](cosign_agent_api/core/results.py)</code> |
+| 401, 500 | <code>[Problem](cosign_agent_api/models/problem.py)</code> |
 | anything unmapped | <code>[RawError](cosign_agent_api/core/results.py)</code> |
 
 </dd>
@@ -179,7 +179,7 @@ Mapped in first-match order -- an earlier row wins over a later range that also 
 
 | Status | `error` is |
 | --- | --- |
-| 401, 429, 500 | <code>[RawError](cosign_agent_api/core/results.py)</code> |
+| 401, 429, 500 | <code>[Problem](cosign_agent_api/models/problem.py)</code> |
 | anything unmapped | <code>[RawError](cosign_agent_api/core/results.py)</code> |
 
 </dd>
@@ -243,7 +243,7 @@ result = client.spend_requests.with_raw_response.create_spend_request(
                 category=Category.OFFICE_SUPPLIES,
                 quantity=2,
                 unit_amount_cents=649,
-                product_url="http://localhost:3001/shop/paper-co/copy-paper-ream",
+                product_url="https://cosign-rd24.onrender.com/shop/paper-co/copy-paper-ream",
             ),
         ],
         total=Money(amount_cents=1298),
@@ -270,7 +270,7 @@ result = await async_client.spend_requests.with_raw_response.create_spend_reques
                 category=Category.OFFICE_SUPPLIES,
                 quantity=2,
                 unit_amount_cents=649,
-                product_url="http://localhost:3001/shop/paper-co/copy-paper-ream",
+                product_url="https://cosign-rd24.onrender.com/shop/paper-co/copy-paper-ream",
             ),
         ],
         total=Money(amount_cents=1298),
@@ -316,7 +316,7 @@ Mapped in first-match order -- an earlier row wins over a later range that also 
 
 | Status | `error` is |
 | --- | --- |
-| 400, 401, 409, 429, 500 | <code>[RawError](cosign_agent_api/core/results.py)</code> |
+| 400, 401, 409, 429, 500 | <code>[Problem](cosign_agent_api/models/problem.py)</code> |
 | anything unmapped | <code>[RawError](cosign_agent_api/core/results.py)</code> |
 
 </dd>
@@ -403,7 +403,7 @@ Mapped in first-match order -- an earlier row wins over a later range that also 
 
 | Status | `error` is |
 | --- | --- |
-| 401, 404, 500 | <code>[RawError](cosign_agent_api/core/results.py)</code> |
+| 401, 404, 500 | <code>[Problem](cosign_agent_api/models/problem.py)</code> |
 | anything unmapped | <code>[RawError](cosign_agent_api/core/results.py)</code> |
 
 </dd>
@@ -488,7 +488,7 @@ Mapped in first-match order -- an earlier row wins over a later range that also 
 
 | Status | `error` is |
 | --- | --- |
-| 401, 500 | <code>[RawError](cosign_agent_api/core/results.py)</code> |
+| 401, 500 | <code>[Problem](cosign_agent_api/models/problem.py)</code> |
 | anything unmapped | <code>[RawError](cosign_agent_api/core/results.py)</code> |
 
 </dd>

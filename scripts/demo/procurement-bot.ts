@@ -86,7 +86,9 @@ async function cosign() {
     api = new CosignAgentApiClient({ ...sdkOptions, agentToken: token.accessToken });
     return api;
   } catch (e) {
-    fail(`Cosign would not let this agent in (${e?.status ? `HTTP ${e.status}` : "no answer"}).`);
+    // Cosign's own problem detail is safe to show; the raw error is not.
+    const detail = e?.payload?.body?.detail;
+    fail(`Cosign would not let this agent in (${e?.status ? `HTTP ${e.status}` : "no answer"}${detail ? `: ${detail}` : ""}).`);
   }
 }
 const httpStatus = (e) => e?.status ?? e?.statusCode ?? null;

@@ -137,6 +137,9 @@ try:
     response = client.agent.get_allowance()
 except ApiError as e:
     # Case A — typed error: e.error is GetAllowanceErrorBody
+    if isinstance(e.error, Problem):
+        # Handle 401, 500
+        print(e.error)
     if isinstance(e.error, RawError):
         # Any other error status
         print(e.status_code, e.error.text())
@@ -158,7 +161,7 @@ Each links to a sub-page with one block per operation, headed by its full access
 | **Parsed raises, raw returns** — `ApiError` versus `ApiResult` | Error-handling model |
 | **Case B error is always `RawError`** — also the last arm of every Case A alias, where a block's **Error arms** bullet ends in it | Error-handling model |
 | **A trailing `request_options`** — keyword-only and optional, for per-call overrides such as a timeout, extra headers, `max_retries` or `status_codes_to_retry`; every signature ends with it | here (`cosign_agent_api/core/request_options.py`), Retries |
-| **Base URL `{host}/api/v1`** — this SDK's only server; override it with `base_url="https://…"` | Servers & auth |
+| **Base URL `https://cosign-rd24.onrender.com/api/v1`** — this SDK's only server; override it with `base_url="https://…"` | Servers & auth |
 | **Parameter names are literal** — signatures are generated code verbatim, and everything behind the bare `*` must be passed by name | here |
 | **A parameter's wire name is its Python name** — sent as-is on the path, query string, header or body, unless the block's **Params** bullet carries a wire name beside the role | here |
 
@@ -218,7 +221,5 @@ A scheme you did not configure is skipped silently rather than raising, and the 
 
 | Base URL | Override point |
 | --- | --- |
-| `{host}/api/v1` | `base_url="https://…"` |
-
-Template template variables: `{host}` defaults to `"http://localhost:3001"` — override the whole URL with `base_url="https://…"`.
+| `https://cosign-rd24.onrender.com/api/v1` | `base_url="https://…"` |
 

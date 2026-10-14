@@ -15,9 +15,10 @@ Accessor: `client.authentication` · Source: `src/resources/authentication.ts` �
 - **SDK-sent**: `header Idempotency-Key` (minted per call)
 - **Returns**: `AgentToken`
 - **Error**: `CosignAgentApiError` with `kind: "api"`, an instance of `Authentication.CreateTokenError` — **typed arms**, narrowed on `err.payload.kind`
-- **Error arms**: `"error401"` [401] no body · `"error429"` [429] no body · `"error500"` [500] no body · `"undeclared"` [any other] `rawBody: ArrayBuffer`
+- **Error arms**: `"problem"` [401] `Problem` · `"problem2"` [429] `Problem` · `"problem3"` [500] `Problem` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
 
 | Type | Schema value | Source |
 | --- | --- | --- |
 | `AgentToken` | `agentTokenSchema` | `src/models/agent-token.ts` |
+| `Problem` | `problemSchema` | `src/models/problem.ts` |
 

@@ -12,7 +12,8 @@ public sealed record ServerEnvironment : ClosedStringEnum<ServerEnvironment>
     }
 
     /// <summary>
-    /// Cosign deployment (PayPal sandbox)
+    /// Hosted Cosign (PayPal sandbox). Running Cosign yourself? Point your SDK
+    /// at it instead, e.g. <c>http://localhost:3001/api/v1</c>.
     /// </summary>
     public static readonly ServerEnvironment Production = new("production");
 

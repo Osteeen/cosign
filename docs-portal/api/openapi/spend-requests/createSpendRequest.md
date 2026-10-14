@@ -23,13 +23,10 @@ ID, so it is never charged twice.
 ```yaml
 openapi: 3.2.0
 servers:
-  - url: "{host}/api/v1"
-    description: Cosign deployment (PayPal sandbox)
-    variables:
-      host:
-        default: http://localhost:3001
-        description: Where Cosign runs, without a trailing slash, for example
-          https://cosign.example.com
+  - url: https://cosign-rd24.onrender.com/api/v1
+    description: |
+      Hosted Cosign (PayPal sandbox). Running Cosign yourself? Point your SDK
+      at it instead, e.g. `http://localhost:3001/api/v1`.
 paths:
   /agent/spend-requests:
     post:
@@ -78,7 +75,7 @@ paths:
                   category: office_supplies
                   quantity: 2
                   unit_amount_cents: 649
-                  product_url: http://localhost:3001/shop/paper-co/copy-paper-ream
+                  product_url: https://cosign-rd24.onrender.com/shop/paper-co/copy-paper-ream
               total:
                 amount_cents: 1298
                 currency: USD
@@ -199,7 +196,7 @@ paths:
                                       Category = Category.OfficeSupplies,
                                       Quantity = 2,
                                       UnitAmountCents = 649L,
-                                      ProductUrl = "http://localhost:3001/shop/paper-co/copy-paper-ream",
+                                      ProductUrl = "https://cosign-rd24.onrender.com/shop/paper-co/copy-paper-ream",
                                   },
                               ],
                               Total = new Money { AmountCents = 1298L },
@@ -212,9 +209,9 @@ paths:
               catch (ApiException<CreateSpendRequestError> ex)
 
               {
-                  if (ex.Error.TryGetNoContent(out var error))
+                  if (ex.Error.TryGetProblem(out var error))
                   {
-                      // TODO: Handle 'error' of type RawError
+                      // TODO: Handle 'error' of type Problem
                   }
               }
         - lang: python
@@ -234,7 +231,7 @@ paths:
                                   category=Category.OFFICE_SUPPLIES,
                                   quantity=2,
                                   unit_amount_cents=649,
-                                  product_url="http://localhost:3001/shop/paper-co/copy-paper-ream",
+                                  product_url="https://cosign-rd24.onrender.com/shop/paper-co/copy-paper-ream",
                               ),
                           ],
                           total=Money(amount_cents=1298),
@@ -264,7 +261,7 @@ paths:
                           quantity: 2,
                           unitAmountCents: 649,
                           productUrl:
-                            "http://localhost:3001/shop/paper-co/copy-paper-ream",
+                            "https://cosign-rd24.onrender.com/shop/paper-co/copy-paper-ream",
                         },
                       ],
                       total: { amountCents: 1298 },
@@ -677,6 +674,9 @@ components:
         `invalid_request`, `idempotency_key_required`,
         `invalid_idempotency_key`)
       content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
@@ -690,6 +690,9 @@ components:
       description: Missing, invalid or expired credential, or the agent is revoked
         (code `unauthorized`)
       content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
@@ -702,6 +705,9 @@ components:
     IdempotencyConflict:
       description: This Idempotency-Key was already used with a different request body
       content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
@@ -720,6 +726,9 @@ components:
             type: integer
           example: 30
       content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
@@ -733,6 +742,9 @@ components:
       description: Something went wrong on Cosign's side (code `internal_error`).
         Nothing was charged.
       content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"

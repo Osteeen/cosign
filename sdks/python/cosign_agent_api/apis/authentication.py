@@ -41,7 +41,7 @@ class Authentication:
         Raises:
             ApiError: Missing, invalid or expired credential, or the agent is revoked (code ``unauthorized``) Too many
                 requests (code ``rate_limited``) Something went wrong on Cosign's side (code ``internal_error``).
-                Nothing was charged. ``error`` is ``RawError``."""
+                Nothing was charged. ``error`` is ``Problem | RawError``."""
         return unwrap(self._with_raw_response.create_token(request_options=request_options))
 
     @property
@@ -71,7 +71,7 @@ class AsyncAuthentication:
         Raises:
             ApiError: Missing, invalid or expired credential, or the agent is revoked (code ``unauthorized``) Too many
                 requests (code ``rate_limited``) Something went wrong on Cosign's side (code ``internal_error``).
-                Nothing was charged. ``error`` is ``RawError``."""
+                Nothing was charged. ``error`` is ``Problem | RawError``."""
         return unwrap(await self._with_raw_response.create_token(request_options=request_options))
 
     @property

@@ -14,7 +14,7 @@ Accessor: `client.spendRequests` · Source: `src/resources/spend-requests.ts` ·
 - **Request body**: `application/json` — the `body` field
 - **Returns**: `SpendRequest`
 - **Error**: `CosignAgentApiError` with `kind: "api"`, an instance of `SpendRequests.CreateSpendRequestError` — **typed arms**, narrowed on `err.payload.kind`
-- **Error arms**: `"error400"` [400] no body · `"error401"` [401] no body · `"error409"` [409] no body · `"error429"` [429] no body · `"error500"` [500] no body · `"undeclared"` [any other] `rawBody: ArrayBuffer`
+- **Error arms**: `"problem"` [400] `Problem` · `"problem2"` [401] `Problem` · `"problem3"` [409] `Problem` · `"problem4"` [429] `Problem` · `"problem5"` [500] `Problem` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
 
 **Fields** — `SpendRequests.CreateSpendRequestRequest` (2):
 
@@ -27,6 +27,7 @@ Accessor: `client.spendRequests` · Source: `src/resources/spend-requests.ts` ·
 | --- | --- | --- |
 | `SpendRequestCreate` | `spendRequestCreateSchema` | `src/models/spend-request-create.ts` |
 | `SpendRequest` | `spendRequestSchema` | `src/models/spend-request.ts` |
+| `Problem` | `problemSchema` | `src/models/problem.ts` |
 
 ### getSpendRequest
 
@@ -36,7 +37,7 @@ Accessor: `client.spendRequests` · Source: `src/resources/spend-requests.ts` ·
 - **Request body**: none — no `Content-Type` header is sent
 - **Returns**: `SpendRequest`
 - **Error**: `CosignAgentApiError` with `kind: "api"`, an instance of `SpendRequests.GetSpendRequestError` — **typed arms**, narrowed on `err.payload.kind`
-- **Error arms**: `"error401"` [401] no body · `"error404"` [404] no body · `"error500"` [500] no body · `"undeclared"` [any other] `rawBody: ArrayBuffer`
+- **Error arms**: `"problem"` [401] `Problem` · `"problem2"` [404] `Problem` · `"problem3"` [500] `Problem` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
 
 **Fields** — `SpendRequests.GetSpendRequestRequest` (1):
 
@@ -47,6 +48,7 @@ Accessor: `client.spendRequests` · Source: `src/resources/spend-requests.ts` ·
 | Type | Schema value | Source |
 | --- | --- | --- |
 | `SpendRequest` | `spendRequestSchema` | `src/models/spend-request.ts` |
+| `Problem` | `problemSchema` | `src/models/problem.ts` |
 
 ### listSpendRequests
 
@@ -56,7 +58,7 @@ Accessor: `client.spendRequests` · Source: `src/resources/spend-requests.ts` ·
 - **Request body**: none — no `Content-Type` header is sent
 - **Returns**: `SpendRequestList`
 - **Error**: `CosignAgentApiError` with `kind: "api"`, an instance of `SpendRequests.ListSpendRequestsError` — **typed arms**, narrowed on `err.payload.kind`
-- **Error arms**: `"error401"` [401] no body · `"error500"` [500] no body · `"undeclared"` [any other] `rawBody: ArrayBuffer`
+- **Error arms**: `"problem"` [401] `Problem` · `"problem2"` [500] `Problem` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
 
 **Fields** — `SpendRequests.ListSpendRequestsRequest` (1):
 
@@ -67,4 +69,5 @@ Accessor: `client.spendRequests` · Source: `src/resources/spend-requests.ts` ·
 | Type | Schema value | Source |
 | --- | --- | --- |
 | `SpendRequestList` | `spendRequestListSchema` | `src/models/spend-request-list.ts` |
+| `Problem` | `problemSchema` | `src/models/problem.ts` |
 

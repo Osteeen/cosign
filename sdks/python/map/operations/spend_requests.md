@@ -16,7 +16,7 @@ Each `###` block is one operation and assumes `sdk-map.md` is loaded: blocks omi
 - **Returns (parsed)**: `SpendRequest`
 - **Returns (raw)**: `ApiResult[SpendRequest, CreateSpendRequestErrorBody]`
 - **Error**: `CreateSpendRequestErrorBody` — **Case A (typed)**
-- **Error arms**: `RawError` [400, 401, 409, 429, 500, anything unmapped]
+- **Error arms**: `Problem` [400, 401, 409, 429, 500] · `RawError` [anything unmapped]
 
 | Type | Source |
 | --- | --- |
@@ -24,6 +24,7 @@ Each `###` block is one operation and assumes `sdk-map.md` is loaded: blocks omi
 | `SpendRequestCreateDict` | `cosign_agent_api/models/spend_request_create.py` |
 | `SpendRequest` | `cosign_agent_api/models/spend_request.py` |
 | `CreateSpendRequestErrorBody` | `cosign_agent_api/errors/create_spend_request_error.py` |
+| `Problem` | `cosign_agent_api/models/problem.py` |
 
 ### client.spend_requests.get_spend_request
 
@@ -35,12 +36,13 @@ Each `###` block is one operation and assumes `sdk-map.md` is loaded: blocks omi
 - **Returns (parsed)**: `SpendRequest`
 - **Returns (raw)**: `ApiResult[SpendRequest, GetSpendRequestErrorBody]`
 - **Error**: `GetSpendRequestErrorBody` — **Case A (typed)**
-- **Error arms**: `RawError` [401, 404, 500, anything unmapped]
+- **Error arms**: `Problem` [401, 404, 500] · `RawError` [anything unmapped]
 
 | Type | Source |
 | --- | --- |
 | `SpendRequest` | `cosign_agent_api/models/spend_request.py` |
 | `GetSpendRequestErrorBody` | `cosign_agent_api/errors/get_spend_request_error.py` |
+| `Problem` | `cosign_agent_api/models/problem.py` |
 
 ### client.spend_requests.list_spend_requests
 
@@ -51,10 +53,11 @@ Each `###` block is one operation and assumes `sdk-map.md` is loaded: blocks omi
 - **Returns (parsed)**: `SpendRequestList`
 - **Returns (raw)**: `ApiResult[SpendRequestList, ListSpendRequestsErrorBody]`
 - **Error**: `ListSpendRequestsErrorBody` — **Case A (typed)**
-- **Error arms**: `RawError` [401, 500, anything unmapped]
+- **Error arms**: `Problem` [401, 500] · `RawError` [anything unmapped]
 
 | Type | Source |
 | --- | --- |
 | `SpendRequestList` | `cosign_agent_api/models/spend_request_list.py` |
 | `ListSpendRequestsErrorBody` | `cosign_agent_api/errors/list_spend_requests_error.py` |
+| `Problem` | `cosign_agent_api/models/problem.py` |
 

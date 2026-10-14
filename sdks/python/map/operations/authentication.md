@@ -14,10 +14,11 @@ Each `###` block is one operation and assumes `sdk-map.md` is loaded: blocks omi
 - **Returns (parsed)**: `AgentToken`
 - **Returns (raw)**: `ApiResult[AgentToken, CreateTokenErrorBody]`
 - **Error**: `CreateTokenErrorBody` — **Case A (typed)**
-- **Error arms**: `RawError` [401, 429, 500, anything unmapped]
+- **Error arms**: `Problem` [401, 429, 500] · `RawError` [anything unmapped]
 
 | Type | Source |
 | --- | --- |
 | `AgentToken` | `cosign_agent_api/models/agent_token.py` |
 | `CreateTokenErrorBody` | `cosign_agent_api/errors/create_token_error.py` |
+| `Problem` | `cosign_agent_api/models/problem.py` |
 

@@ -7,13 +7,10 @@ This agent's own requests, newest first. Not paginated yet; `next_cursor` is alw
 ```yaml
 openapi: 3.2.0
 servers:
-  - url: "{host}/api/v1"
-    description: Cosign deployment (PayPal sandbox)
-    variables:
-      host:
-        default: http://localhost:3001
-        description: Where Cosign runs, without a trailing slash, for example
-          https://cosign.example.com
+  - url: https://cosign-rd24.onrender.com/api/v1
+    description: |
+      Hosted Cosign (PayPal sandbox). Running Cosign yourself? Point your SDK
+      at it instead, e.g. `http://localhost:3001/api/v1`.
 paths:
   /agent/spend-requests:
     get:
@@ -62,9 +59,9 @@ paths:
               }
               catch (ApiException<ListSpendRequestsError> ex)
               {
-                  if (ex.Error.TryGetNoContent(out var error))
+                  if (ex.Error.TryGetProblem(out var error))
                   {
-                      // TODO: Handle 'error' of type RawError
+                      // TODO: Handle 'error' of type Problem
                   }
               }
         - lang: python
@@ -437,6 +434,9 @@ components:
       description: Missing, invalid or expired credential, or the agent is revoked
         (code `unauthorized`)
       content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
@@ -450,6 +450,9 @@ components:
       description: Something went wrong on Cosign's side (code `internal_error`).
         Nothing was charged.
       content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"

@@ -8,8 +8,7 @@ export type Servers = {
 };
 
 const serverSchemas = {
-  baseUrl: s.of(s.defaulted(s.string(), "{host}/api/v1")),
-  host: s.of(s.defaulted(s.string(), "http://localhost:3001")),
+  baseUrl: s.of(s.defaulted(s.string(), "https://cosign-rd24.onrender.com/api/v1")),
 };
 
 export function buildServers(options: ClientOptions): Servers {
@@ -22,8 +21,5 @@ export function buildServers(options: ClientOptions): Servers {
 }
 
 function defaultServer(options: ClientOptions): ServerBase {
-  return {
-    baseUrl: serverSchemas.baseUrl.decode(options.serverOptions?.baseUrl),
-    variables: { host: serverSchemas.host.decode(options.serverOptions?.host) },
-  };
+  return { baseUrl: serverSchemas.baseUrl.decode(options.serverOptions?.baseUrl) };
 }

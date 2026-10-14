@@ -4,6 +4,7 @@ import type { ApiPromise } from "../core/api-promise.js";
 import type { RequestOptions } from "../core/api-request.js";
 import type { RawClient } from "../core/raw-client.js";
 import * as s from "../core/validation/index.js";
+import { problemSchema, type Problem } from "../models/problem.js";
 import { spendRequestCreateSchema, type SpendRequestCreate } from "../models/spend-request-create.js";
 import { spendRequestListSchema, type SpendRequestList } from "../models/spend-request-list.js";
 import { spendRequestSchema, type SpendRequest } from "../models/spend-request.js";
@@ -159,19 +160,19 @@ export namespace SpendRequests {
 
   export class CreateSpendRequestError extends ApiError {
     declare readonly payload: ErrorPayload<
-      | Declared<"error400", undefined>
-      | Declared<"error401", undefined>
-      | Declared<"error409", undefined>
-      | Declared<"error429", undefined>
-      | Declared<"error500", undefined>
+      | Declared<"problem", Problem>
+      | Declared<"problem2", Problem>
+      | Declared<"problem3", Problem>
+      | Declared<"problem4", Problem>
+      | Declared<"problem5", Problem>
     >;
 
     static readonly errors: ErrorDecoders<CreateSpendRequestError> = [
-      { on: 400, kind: "error400", decode: { kind: "empty" } },
-      { on: 401, kind: "error401", decode: { kind: "empty" } },
-      { on: 409, kind: "error409", decode: { kind: "empty" } },
-      { on: 429, kind: "error429", decode: { kind: "empty" } },
-      { on: 500, kind: "error500", decode: { kind: "empty" } },
+      { on: 400, kind: "problem", decode: { kind: "json", schema: problemSchema } },
+      { on: 401, kind: "problem2", decode: { kind: "json", schema: problemSchema } },
+      { on: 409, kind: "problem3", decode: { kind: "json", schema: problemSchema } },
+      { on: 429, kind: "problem4", decode: { kind: "json", schema: problemSchema } },
+      { on: 500, kind: "problem5", decode: { kind: "json", schema: problemSchema } },
     ];
   }
 
@@ -182,13 +183,13 @@ export namespace SpendRequests {
 
   export class GetSpendRequestError extends ApiError {
     declare readonly payload: ErrorPayload<
-      Declared<"error401", undefined> | Declared<"error404", undefined> | Declared<"error500", undefined>
+      Declared<"problem", Problem> | Declared<"problem2", Problem> | Declared<"problem3", Problem>
     >;
 
     static readonly errors: ErrorDecoders<GetSpendRequestError> = [
-      { on: 401, kind: "error401", decode: { kind: "empty" } },
-      { on: 404, kind: "error404", decode: { kind: "empty" } },
-      { on: 500, kind: "error500", decode: { kind: "empty" } },
+      { on: 401, kind: "problem", decode: { kind: "json", schema: problemSchema } },
+      { on: 404, kind: "problem2", decode: { kind: "json", schema: problemSchema } },
+      { on: 500, kind: "problem3", decode: { kind: "json", schema: problemSchema } },
     ];
   }
 
@@ -198,11 +199,11 @@ export namespace SpendRequests {
   };
 
   export class ListSpendRequestsError extends ApiError {
-    declare readonly payload: ErrorPayload<Declared<"error401", undefined> | Declared<"error500", undefined>>;
+    declare readonly payload: ErrorPayload<Declared<"problem", Problem> | Declared<"problem2", Problem>>;
 
     static readonly errors: ErrorDecoders<ListSpendRequestsError> = [
-      { on: 401, kind: "error401", decode: { kind: "empty" } },
-      { on: 500, kind: "error500", decode: { kind: "empty" } },
+      { on: 401, kind: "problem", decode: { kind: "json", schema: problemSchema } },
+      { on: 500, kind: "problem2", decode: { kind: "json", schema: problemSchema } },
     ];
   }
 }

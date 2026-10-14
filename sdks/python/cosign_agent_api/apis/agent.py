@@ -34,8 +34,8 @@ class Agent:
 
         Raises:
             ApiError: Missing, invalid or expired credential, or the agent is revoked (code ``unauthorized``) Something
-                went wrong on Cosign's side (code ``internal_error``). Nothing was charged. ``error`` is
-                ``RawError``."""
+                went wrong on Cosign's side (code ``internal_error``). Nothing was charged. ``error`` is ``Problem |
+                RawError``."""
         return unwrap(self._with_raw_response.get_allowance(request_options=request_options))
 
     @property
@@ -61,8 +61,8 @@ class AsyncAgent:
 
         Raises:
             ApiError: Missing, invalid or expired credential, or the agent is revoked (code ``unauthorized``) Something
-                went wrong on Cosign's side (code ``internal_error``). Nothing was charged. ``error`` is
-                ``RawError``."""
+                went wrong on Cosign's side (code ``internal_error``). Nothing was charged. ``error`` is ``Problem |
+                RawError``."""
         return unwrap(await self._with_raw_response.get_allowance(request_options=request_options))
 
     @property

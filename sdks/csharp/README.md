@@ -67,7 +67,7 @@ a sign the agent was manipulated by a web page.
 ## MCP
 
 MCP-capable AI assistants can use Cosign without an
-SDK: the MCP endpoint is `POST {host}/api/mcp` (streamable HTTP,
+SDK: the MCP endpoint is `POST https://cosign-rd24.onrender.com/api/mcp` (streamable HTTP,
 stateless), with the agent key as `Authorization: Bearer key_...:cs_...`.
 Its tools mirror this API: `cosign_get_allowance`,
 `cosign_request_purchase`, `cosign_get_purchase`, `cosign_list_purchases`.
@@ -206,9 +206,9 @@ catch (ApiException<GetAllowanceError> ex)
 {
     // "GET <server>/agent/me returned 401 (Unauthorized)."
     Console.Error.WriteLine(ex.Message);
-    if (ex.Error.TryGetNoContent(out var noContent))
+    if (ex.Error.TryGetProblem(out var problem))
     {
-        // TODO: handle 'noContent' of type RawError
+        // TODO: handle 'problem' of type Problem
     }
 }
 ```

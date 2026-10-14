@@ -107,7 +107,7 @@ try
 catch (ApiException<GetAllowanceError> ex)
 {
     // Case A — typed error
-    if (ex.Error.TryGetNoContent(out var error))
+    if (ex.Error.TryGetProblem(out var error))
     {
         // Handle 401, 500
     }
@@ -196,15 +196,13 @@ A credential you never set is skipped rather than throwing, and the request is s
 
 | Environment | Value | Hosting |
 | --- | --- | --- |
-| `ServerEnvironment.Production` *(default)* | `production` | Cosign deployment (PayPal sandbox) |
+| `ServerEnvironment.Production` *(default)* | `production` | Hosted Cosign (PayPal sandbox). Running Cosign yourself? Point your SDK<br>at it instead, e.g. `http://localhost:3001/api/v1`. |
 
 **1 server group.** Base-URL templates and override points (`options.Server.…`):
 
 | Group | `Production` base URL | Override point |
 | --- | --- | --- |
-| `Default` | `{host}/api/v1` | `options.Server.Default.Production.BaseUrl` |
-
-`Default` · `Production` template variables: `{host}` defaults to `"http://localhost:3001"` — override `options.Server.Default.Production.Host`.
+| `Default` | `https://cosign-rd24.onrender.com/api/v1` | `options.Server.Default.Production.BaseUrl` |
 
 Retry/resilience is configurable via `options.Retry` (`RetryOptions`, backed by Polly).
 

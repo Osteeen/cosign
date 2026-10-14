@@ -6,6 +6,7 @@ import type { RawClient } from "../core/raw-client.js";
 import { uuid } from "../core/uuid.js";
 import * as s from "../core/validation/index.js";
 import { agentTokenSchema, type AgentToken } from "../models/agent-token.js";
+import { problemSchema, type Problem } from "../models/problem.js";
 import type { Servers } from "../servers.js";
 
 /**
@@ -65,13 +66,13 @@ export class Authentication {
 export namespace Authentication {
   export class CreateTokenError extends ApiError {
     declare readonly payload: ErrorPayload<
-      Declared<"error401", undefined> | Declared<"error429", undefined> | Declared<"error500", undefined>
+      Declared<"problem", Problem> | Declared<"problem2", Problem> | Declared<"problem3", Problem>
     >;
 
     static readonly errors: ErrorDecoders<CreateTokenError> = [
-      { on: 401, kind: "error401", decode: { kind: "empty" } },
-      { on: 429, kind: "error429", decode: { kind: "empty" } },
-      { on: 500, kind: "error500", decode: { kind: "empty" } },
+      { on: 401, kind: "problem", decode: { kind: "json", schema: problemSchema } },
+      { on: 429, kind: "problem2", decode: { kind: "json", schema: problemSchema } },
+      { on: 500, kind: "problem3", decode: { kind: "json", schema: problemSchema } },
     ];
   }
 }

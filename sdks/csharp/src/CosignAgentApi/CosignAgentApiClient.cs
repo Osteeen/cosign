@@ -72,7 +72,7 @@ namespace CosignAgentApi;
 /// </para>
 /// <para>
 /// MCP-capable AI assistants can use Cosign without an
-/// SDK: the MCP endpoint is <c>POST {host}/api/mcp</c> (streamable HTTP,
+/// SDK: the MCP endpoint is <c>POST https://cosign-rd24.onrender.com/api/mcp</c> (streamable HTTP,
 /// stateless), with the agent key as <c>Authorization: Bearer key_...:cs_...</c>.
 /// Its tools mirror this API: <c>cosign_get_allowance</c>,
 /// <c>cosign_request_purchase</c>, <c>cosign_get_purchase</c>, <c>cosign_list_purchases</c>.

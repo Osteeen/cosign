@@ -41,9 +41,9 @@ try
 }
 catch (ApiException<GetAllowanceError> ex)
 {
-    if (ex.Error.TryGetNoContent(out var error))
+    if (ex.Error.TryGetProblem(out var error))
     {
-        // TODO: Handle 'error' of type RawError
+        // TODO: Handle 'error' of type Problem
     }
 }
 ```
@@ -107,9 +107,9 @@ try
 }
 catch (ApiException<CreateTokenError> ex)
 {
-    if (ex.Error.TryGetNoContent(out var error))
+    if (ex.Error.TryGetProblem(out var error))
     {
-        // TODO: Handle 'error' of type RawError
+        // TODO: Handle 'error' of type Problem
     }
 }
 ```
@@ -190,7 +190,7 @@ try
                     Category = Category.OfficeSupplies,
                     Quantity = 2,
                     UnitAmountCents = 649L,
-                    ProductUrl = "http://localhost:3001/shop/paper-co/copy-paper-ream",
+                    ProductUrl = "https://cosign-rd24.onrender.com/shop/paper-co/copy-paper-ream",
                 },
             ],
             Total = new Money { AmountCents = 1298L },
@@ -201,9 +201,9 @@ try
 }
 catch (ApiException<CreateSpendRequestError> ex)
 {
-    if (ex.Error.TryGetNoContent(out var error))
+    if (ex.Error.TryGetProblem(out var error))
     {
-        // TODO: Handle 'error' of type RawError
+        // TODO: Handle 'error' of type Problem
     }
 }
 ```
@@ -270,9 +270,9 @@ try
 }
 catch (ApiException<GetSpendRequestError> ex)
 {
-    if (ex.Error.TryGetNoContent(out var error))
+    if (ex.Error.TryGetProblem(out var error))
     {
-        // TODO: Handle 'error' of type RawError
+        // TODO: Handle 'error' of type Problem
     }
 }
 ```
@@ -336,9 +336,9 @@ try
 }
 catch (ApiException<ListSpendRequestsError> ex)
 {
-    if (ex.Error.TryGetNoContent(out var error))
+    if (ex.Error.TryGetProblem(out var error))
     {
-        // TODO: Handle 'error' of type RawError
+        // TODO: Handle 'error' of type Problem
     }
 }
 ```

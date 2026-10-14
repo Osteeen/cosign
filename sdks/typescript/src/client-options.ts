@@ -14,14 +14,11 @@ type SdkClientOptions = ServerOptions & {
 };
 
 type ServerOptions = {
-  /** Cosign deployment (PayPal sandbox) */
+  /**
+   * Hosted Cosign (PayPal sandbox). Running Cosign yourself? Point your SDK at it instead, e.g.
+   * `http://localhost:3001/api/v1`.
+   */
   readonly serverOptions?: {
     baseUrl?: string;
-    /**
-     * Where Cosign runs, without a trailing slash, for example https://cosign.example.com
-     *
-     * @default "http://localhost:3001"
-     */
-    host?: string;
   };
 };

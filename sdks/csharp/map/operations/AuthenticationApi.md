@@ -12,10 +12,11 @@ Accessor: `client.AuthenticationApi` · Source: `src/CosignAgentApi/Api/Authenti
 - **Signature**: `CreateToken(RequestOptions? requestOptions = null, CancellationToken cancellationToken = default)`
 - **Returns**: `AgentToken`
 - **Error**: `ApiException<CreateTokenError>` — **Case A (typed)**
-- **Error accessors**: `TryGetNoContent(out RawError)` [401, 429, 500] · `TryGetRawError(out RawError)` [fallback]
+- **Error accessors**: `TryGetProblem(out Problem)` [401, 429, 500] · `TryGetRawError(out RawError)` [fallback]
 
 | Type | Source |
 | --- | --- |
 | `AgentToken` | `src/CosignAgentApi/Models/AgentToken.cs` |
 | `CreateTokenError` | `src/CosignAgentApi/Errors/CreateTokenError.cs` |
+| `Problem` | `src/CosignAgentApi/Models/Problem.cs` |
 

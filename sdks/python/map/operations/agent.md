@@ -14,10 +14,11 @@ Each `###` block is one operation and assumes `sdk-map.md` is loaded: blocks omi
 - **Returns (parsed)**: `Allowance`
 - **Returns (raw)**: `ApiResult[Allowance, GetAllowanceErrorBody]`
 - **Error**: `GetAllowanceErrorBody` — **Case A (typed)**
-- **Error arms**: `RawError` [401, 500, anything unmapped]
+- **Error arms**: `Problem` [401, 500] · `RawError` [anything unmapped]
 
 | Type | Source |
 | --- | --- |
 | `Allowance` | `cosign_agent_api/models/allowance.py` |
 | `GetAllowanceErrorBody` | `cosign_agent_api/errors/get_allowance_error.py` |
+| `Problem` | `cosign_agent_api/models/problem.py` |
 

@@ -13,7 +13,7 @@ Accessor: `client.SpendRequests` · Source: `src/CosignAgentApi/Api/SpendRequest
   - required: `IdempotencyKey`, `Body`
 - **Returns**: `SpendRequest`
 - **Error**: `ApiException<CreateSpendRequestError>` — **Case A (typed)**
-- **Error accessors**: `TryGetNoContent(out RawError)` [400, 401, 409, 429, 500] · `TryGetRawError(out RawError)` [fallback]
+- **Error accessors**: `TryGetProblem(out Problem)` [400, 401, 409, 429, 500] · `TryGetRawError(out RawError)` [fallback]
 
 | Type | Source |
 | --- | --- |
@@ -21,6 +21,7 @@ Accessor: `client.SpendRequests` · Source: `src/CosignAgentApi/Api/SpendRequest
 | `SpendRequestCreate` | `src/CosignAgentApi/Models/SpendRequestCreate.cs` |
 | `SpendRequest` | `src/CosignAgentApi/Models/SpendRequest.cs` |
 | `CreateSpendRequestError` | `src/CosignAgentApi/Errors/CreateSpendRequestError.cs` |
+| `Problem` | `src/CosignAgentApi/Models/Problem.cs` |
 
 ### GetSpendRequest
 
@@ -29,13 +30,14 @@ Accessor: `client.SpendRequests` · Source: `src/CosignAgentApi/Api/SpendRequest
   - required: `SpendRequestId`
 - **Returns**: `SpendRequest`
 - **Error**: `ApiException<GetSpendRequestError>` — **Case A (typed)**
-- **Error accessors**: `TryGetNoContent(out RawError)` [401, 404, 500] · `TryGetRawError(out RawError)` [fallback]
+- **Error accessors**: `TryGetProblem(out Problem)` [401, 404, 500] · `TryGetRawError(out RawError)` [fallback]
 
 | Type | Source |
 | --- | --- |
 | `GetSpendRequest` | `src/CosignAgentApi/Requests/SpendRequests/GetSpendRequest.cs` |
 | `SpendRequest` | `src/CosignAgentApi/Models/SpendRequest.cs` |
 | `GetSpendRequestError` | `src/CosignAgentApi/Errors/GetSpendRequestError.cs` |
+| `Problem` | `src/CosignAgentApi/Models/Problem.cs` |
 
 ### ListSpendRequests
 
@@ -44,11 +46,12 @@ Accessor: `client.SpendRequests` · Source: `src/CosignAgentApi/Api/SpendRequest
 - **Query params (wire ← C#)**: `limit` ← `Limit`
 - **Returns**: `SpendRequestList`
 - **Error**: `ApiException<ListSpendRequestsError>` — **Case A (typed)**
-- **Error accessors**: `TryGetNoContent(out RawError)` [401, 500] · `TryGetRawError(out RawError)` [fallback]
+- **Error accessors**: `TryGetProblem(out Problem)` [401, 500] · `TryGetRawError(out RawError)` [fallback]
 
 | Type | Source |
 | --- | --- |
 | `ListSpendRequestsRequest` | `src/CosignAgentApi/Requests/SpendRequests/ListSpendRequestsRequest.cs` |
 | `SpendRequestList` | `src/CosignAgentApi/Models/SpendRequestList.cs` |
 | `ListSpendRequestsError` | `src/CosignAgentApi/Errors/ListSpendRequestsError.cs` |
+| `Problem` | `src/CosignAgentApi/Models/Problem.cs` |
 

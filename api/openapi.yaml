@@ -61,7 +61,7 @@ info:
     ## MCP
 
     MCP-capable AI assistants can use Cosign without an
-    SDK: the MCP endpoint is `POST {host}/api/mcp` (streamable HTTP,
+    SDK: the MCP endpoint is `POST https://cosign-rd24.onrender.com/api/mcp` (streamable HTTP,
     stateless), with the agent key as `Authorization: Bearer key_...:cs_...`.
     Its tools mirror this API: `cosign_get_allowance`,
     `cosign_request_purchase`, `cosign_get_purchase`, `cosign_list_purchases`.
@@ -77,12 +77,10 @@ info:
     identifier: MIT
 
 servers:
-  - url: "{host}/api/v1"
-    description: Cosign deployment (PayPal sandbox)
-    variables:
-      host:
-        default: http://localhost:3001
-        description: Where Cosign runs, without a trailing slash, for example https://cosign.example.com
+  - url: https://cosign-rd24.onrender.com/api/v1
+    description: |
+      Hosted Cosign (PayPal sandbox). Running Cosign yourself? Point your SDK
+      at it instead, e.g. `http://localhost:3001/api/v1`.
 
 tags:
   - name: Authentication
@@ -163,7 +161,7 @@ paths:
                         id: 7d1c2b3a-4e5f-4a6b-9c7d-8e9f0a1b2c3d
                         name: Paper Co
                         categories: [office_supplies]
-                        website: http://localhost:3001/shop/paper-co
+                        website: https://cosign-rd24.onrender.com/shop/paper-co
                       remaining_in_hold: { amount_cents: 7720, currency: USD }
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -210,7 +208,7 @@ paths:
                   category: office_supplies
                   quantity: 2
                   unit_amount_cents: 649
-                  product_url: http://localhost:3001/shop/paper-co/copy-paper-ream
+                  product_url: https://cosign-rd24.onrender.com/shop/paper-co/copy-paper-ream
               total: { amount_cents: 1298, currency: USD }
               purpose: Restock printer paper for the office.
       responses:
@@ -403,6 +401,9 @@ components:
     BadRequest:
       description: Malformed or invalid request (codes `invalid_json`, `invalid_request`, `idempotency_key_required`, `invalid_idempotency_key`)
       content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
@@ -415,6 +416,9 @@ components:
     Unauthorized:
       description: Missing, invalid or expired credential, or the agent is revoked (code `unauthorized`)
       content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
@@ -427,6 +431,9 @@ components:
     NotFound:
       description: Not found, or not this agent's (the two look the same on purpose)
       content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
@@ -439,6 +446,9 @@ components:
     IdempotencyConflict:
       description: This Idempotency-Key was already used with a different request body
       content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
@@ -457,6 +467,9 @@ components:
             type: integer
           example: 30
       content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
@@ -469,6 +482,9 @@ components:
     ServerError:
       description: Something went wrong on Cosign's side (code `internal_error`). Nothing was charged.
       content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"

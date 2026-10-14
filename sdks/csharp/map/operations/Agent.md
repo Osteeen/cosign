@@ -12,10 +12,11 @@ Accessor: `client.Agent` · Source: `src/CosignAgentApi/Api/Agent.cs` · 1 opera
 - **Signature**: `GetAllowance(RequestOptions? requestOptions = null, CancellationToken cancellationToken = default)`
 - **Returns**: `Allowance`
 - **Error**: `ApiException<GetAllowanceError>` — **Case A (typed)**
-- **Error accessors**: `TryGetNoContent(out RawError)` [401, 500] · `TryGetRawError(out RawError)` [fallback]
+- **Error accessors**: `TryGetProblem(out Problem)` [401, 500] · `TryGetRawError(out RawError)` [fallback]
 
 | Type | Source |
 | --- | --- |
 | `Allowance` | `src/CosignAgentApi/Models/Allowance.cs` |
 | `GetAllowanceError` | `src/CosignAgentApi/Errors/GetAllowanceError.cs` |
+| `Problem` | `src/CosignAgentApi/Models/Problem.cs` |
 

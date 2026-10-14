@@ -4,6 +4,7 @@ import type { ApiPromise } from "../core/api-promise.js";
 import type { RequestOptions } from "../core/api-request.js";
 import type { RawClient } from "../core/raw-client.js";
 import { allowanceSchema, type Allowance } from "../models/allowance.js";
+import { problemSchema, type Problem } from "../models/problem.js";
 import type { Servers } from "../servers.js";
 
 /**
@@ -60,11 +61,11 @@ export class Agent {
 
 export namespace Agent {
   export class GetAllowanceError extends ApiError {
-    declare readonly payload: ErrorPayload<Declared<"error401", undefined> | Declared<"error500", undefined>>;
+    declare readonly payload: ErrorPayload<Declared<"problem", Problem> | Declared<"problem2", Problem>>;
 
     static readonly errors: ErrorDecoders<GetAllowanceError> = [
-      { on: 401, kind: "error401", decode: { kind: "empty" } },
-      { on: 500, kind: "error500", decode: { kind: "empty" } },
+      { on: 401, kind: "problem", decode: { kind: "json", schema: problemSchema } },
+      { on: 500, kind: "problem2", decode: { kind: "json", schema: problemSchema } },
     ];
   }
 }

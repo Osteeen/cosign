@@ -14,9 +14,10 @@ Accessor: `client.agent` · Source: `src/resources/agent.ts` · 1 operation · R
 - **Request body**: none — no `Content-Type` header is sent
 - **Returns**: `Allowance`
 - **Error**: `CosignAgentApiError` with `kind: "api"`, an instance of `Agent.GetAllowanceError` — **typed arms**, narrowed on `err.payload.kind`
-- **Error arms**: `"error401"` [401] no body · `"error500"` [500] no body · `"undeclared"` [any other] `rawBody: ArrayBuffer`
+- **Error arms**: `"problem"` [401] `Problem` · `"problem2"` [500] `Problem` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
 
 | Type | Schema value | Source |
 | --- | --- | --- |
 | `Allowance` | `allowanceSchema` | `src/models/allowance.ts` |
+| `Problem` | `problemSchema` | `src/models/problem.ts` |
 

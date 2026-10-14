@@ -64,7 +64,7 @@ class SpendRequests:
                 ``idempotency_key_required``, ``invalid_idempotency_key``) Missing, invalid or expired credential, or
                 the agent is revoked (code ``unauthorized``) This Idempotency-Key was already used with a different
                 request body Too many requests (code ``rate_limited``) Something went wrong on Cosign's side (code
-                ``internal_error``). Nothing was charged. ``error`` is ``RawError``."""
+                ``internal_error``). Nothing was charged. ``error`` is ``Problem | RawError``."""
         return unwrap(
             self._with_raw_response.create_spend_request(idempotency_key, body, request_options=request_options)
         )
@@ -86,7 +86,7 @@ class SpendRequests:
         Raises:
             ApiError: Missing, invalid or expired credential, or the agent is revoked (code ``unauthorized``) Not found,
                 or not this agent's (the two look the same on purpose) Something went wrong on Cosign's side (code
-                ``internal_error``). Nothing was charged. ``error`` is ``RawError``."""
+                ``internal_error``). Nothing was charged. ``error`` is ``Problem | RawError``."""
         return unwrap(self._with_raw_response.get_spend_request(spend_request_id, request_options=request_options))
 
     def list_spend_requests(
@@ -105,8 +105,8 @@ class SpendRequests:
 
         Raises:
             ApiError: Missing, invalid or expired credential, or the agent is revoked (code ``unauthorized``) Something
-                went wrong on Cosign's side (code ``internal_error``). Nothing was charged. ``error`` is
-                ``RawError``."""
+                went wrong on Cosign's side (code ``internal_error``). Nothing was charged. ``error`` is ``Problem |
+                RawError``."""
         return unwrap(self._with_raw_response.list_spend_requests(limit=limit, request_options=request_options))
 
     @property
@@ -154,7 +154,7 @@ class AsyncSpendRequests:
                 ``idempotency_key_required``, ``invalid_idempotency_key``) Missing, invalid or expired credential, or
                 the agent is revoked (code ``unauthorized``) This Idempotency-Key was already used with a different
                 request body Too many requests (code ``rate_limited``) Something went wrong on Cosign's side (code
-                ``internal_error``). Nothing was charged. ``error`` is ``RawError``."""
+                ``internal_error``). Nothing was charged. ``error`` is ``Problem | RawError``."""
         return unwrap(
             await self._with_raw_response.create_spend_request(idempotency_key, body, request_options=request_options)
         )
@@ -176,7 +176,7 @@ class AsyncSpendRequests:
         Raises:
             ApiError: Missing, invalid or expired credential, or the agent is revoked (code ``unauthorized``) Not found,
                 or not this agent's (the two look the same on purpose) Something went wrong on Cosign's side (code
-                ``internal_error``). Nothing was charged. ``error`` is ``RawError``."""
+                ``internal_error``). Nothing was charged. ``error`` is ``Problem | RawError``."""
         return unwrap(
             await self._with_raw_response.get_spend_request(spend_request_id, request_options=request_options)
         )
@@ -197,8 +197,8 @@ class AsyncSpendRequests:
 
         Raises:
             ApiError: Missing, invalid or expired credential, or the agent is revoked (code ``unauthorized``) Something
-                went wrong on Cosign's side (code ``internal_error``). Nothing was charged. ``error`` is
-                ``RawError``."""
+                went wrong on Cosign's side (code ``internal_error``). Nothing was charged. ``error`` is ``Problem |
+                RawError``."""
         return unwrap(await self._with_raw_response.list_spend_requests(limit=limit, request_options=request_options))
 
     @property
