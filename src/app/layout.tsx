@@ -12,9 +12,18 @@ const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], var
 // Used only for the owner's co-signature.
 const signature = Mrs_Saint_Delafield({ subsets: ["latin"], weight: "400", variable: "--font-signature-script", display: "swap" });
 
+const TITLE = "Cosign - Your agents spend. You co-sign.";
+const DESCRIPTION =
+  "A company card for AI agents, built on PayPal. Give each agent a permission slip - Cosign checks every purchase, and PayPal pays the store directly. Try the demo, no sign-up.";
+
+// Link previews need absolute URLs, so they are built from the public address.
 export const metadata: Metadata = {
-  title: "Cosign",
-  description: "Give each AI agent a permission slip. Cosign checks every purchase, and PayPal pays the store directly.",
+  metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3001"),
+  title: TITLE,
+  description: DESCRIPTION,
+  applicationName: "Cosign",
+  openGraph: { type: "website", siteName: "Cosign", title: TITLE, description: DESCRIPTION, locale: "en_US" },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
