@@ -64,10 +64,21 @@ function Landing({ demo }: { demo: boolean }) {
           purchase against it, and PayPal pays the store directly.
         </p>
         <div className="hero-actions rise" style={delay(240)}>
-          <Link href="/sign-in" className="button button-primary">
-            Sign in to Cosign
-          </Link>
-          {demo ? <DemoButton /> : <span className="hero-note">No password. We email you a link.</span>}
+          {demo ? (
+            <>
+              <DemoButton className="button button-primary" />
+              <Link href="/sign-in" className="button button-quiet">
+                Sign in
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/sign-in" className="button button-primary">
+                Sign in to Cosign
+              </Link>
+              <span className="hero-note">No password. We email you a link.</span>
+            </>
+          )}
         </div>
         <ul className="hero-promises rise" style={delay(360)}>
           <li>Agents never see your PayPal</li>
