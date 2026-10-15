@@ -1,57 +1,86 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { DOCS_URL } from "@/lib/links";
 import { DemoButton } from "./demo-button";
+import { RevealSection } from "./reveal-section";
 
 // The rest of the signed-out homepage: how Cosign works, a step-by-step guide
 // to the demo (for judges and visitors), what developers get, and what is real
 // versus sandbox.
 
 const HOW = [
-  {
-    title: "Write a permission slip",
-    text: "A budget, a per-purchase limit, when to ask you, and where it may shop. Say it in plain words - AI fills in the rules, you co-sign.",
-  },
-  {
-    title: "Approve PayPal budget holds",
-    text: "One per store, in PayPal. Nothing is paid yet - the money stays on your PayPal.",
-  },
-  {
-    title: "Your agent asks Cosign",
-    text: "Through the API or MCP. Fixed rules decide, and an AI check can only make the answer stricter.",
-  },
-  {
-    title: "PayPal pays the store",
-    text: "Straight from the hold - or Cosign asks you first, or blocks it. Pause or revoke any agent at any time.",
-  },
+  { title: "Write a permission slip", text: "A budget, a limit per purchase, the stores it may use. Plain words work." },
+  { title: "Approve PayPal budget holds", text: "One per store, in PayPal. Nothing is paid yet." },
+  { title: "Your agent asks Cosign", text: "Fixed rules decide. An AI check can only make it stricter." },
+  { title: "PayPal pays the store", text: "Or Cosign asks you first, or blocks it - with the reason." },
 ];
 
-// "How it works", in the hero beside the example slip.
-export function HowItWorks() {
+const ANSWERS = [
+  { stamp: "allow", label: "Paid", what: "Coffee beans", amount: "$24.00", why: "Inside every rule, so PayPal pays the store at once." },
+  { stamp: "ask", label: "Ask you", what: "Printer toner", amount: "$80.00", why: "Over your $50.00 limit. You approve the exact cart you see." },
+  { stamp: "deny", label: "Blocked", what: "50 gift cards", amount: "$1,250.00", why: "Not an allowed category, and over budget. Nothing is charged." },
+] as const;
+
+const order = (i: number) => ({ "--i": i }) as CSSProperties;
+
+// How it works: four steps joined by a ballpoint stroke (the wordmark's pen line).
+function HowStrip() {
   return (
-    <section className="hero-how" aria-labelledby="how">
-      <h2 id="how" className="section-label">
-        How it works
-      </h2>
-      <ol>
-        {HOW.map((s, i) => (
-          <li key={s.title}>
-            <span className="landing-num" aria-hidden="true">
-              {i + 1}
-            </span>
-            <div>
+    <RevealSection className="how" aria-labelledby="how">
+      <div className="how-head">
+        <p className="section-label">How it works</p>
+        <h2 id="how" className="landing-title">
+          Set it up once. Then your agents shop on their own.
+        </h2>
+      </div>
+      <div className="how-track">
+        <svg className="how-line" viewBox="0 0 1000 40" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M8 24 C 150 6, 300 36, 500 20 S 840 6, 992 22" pathLength="1" />
+        </svg>
+        <ol className="how-steps">
+          {HOW.map((s, i) => (
+            <li key={s.title} style={order(i)}>
+              <span className="how-num" aria-hidden="true">
+                {i + 1}
+              </span>
               <h3>{s.title}</h3>
               <p>{s.text}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </RevealSection>
+  );
+}
+
+// The three answers any purchase can get, shown as the stamps owners see.
+function Answers() {
+  return (
+    <RevealSection className="landing-section" aria-labelledby="answers">
+      <h2 id="answers" className="landing-title">
+        Every purchase gets one of three answers
+      </h2>
+      <ul className="answers">
+        {ANSWERS.map((a, i) => (
+          <li key={a.label} className={`answer answer-${a.stamp}`} style={order(i)}>
+            <div className="answer-top">
+              <span className={`stamp stamp-${a.stamp}`}>{a.label}</span>
+              <span className="answer-amount">{a.amount}</span>
             </div>
+            <h3>{a.what}</h3>
+            <p>{a.why}</p>
           </li>
         ))}
-      </ol>
-    </section>
+      </ul>
+    </RevealSection>
   );
 }
 
 export function LandingGuide({ demo }: { demo: boolean }) {
   return (
     <div className="landing-guide">
+      <HowStrip />
+      <Answers />
       {demo ? (
         <section className="landing-section" aria-labelledby="tour">
           <h2 id="tour" className="landing-title">

@@ -12,7 +12,7 @@ import { BulkNotice, Notice } from "@/components/notice";
 import { BulkApprovals } from "@/components/bulk-approvals";
 import { DemoButton } from "@/components/demo-button";
 import { DemoBotPanel } from "@/components/demo-bot-panel";
-import { DemoTour, HowItWorks, LandingGuide } from "@/components/landing-guide";
+import { DemoTour, LandingGuide } from "@/components/landing-guide";
 import { demoEnabled, isDemoOwner } from "@/lib/demo/account";
 import { Slip } from "@/components/slip";
 import { Topbar } from "@/components/topbar";
@@ -30,14 +30,8 @@ const exampleRows = [
   { label: "Categories", value: "Office supplies, groceries" },
 ];
 
-const exampleDecisions = [
-  { stamp: "allow", label: "Paid", amount: "$24.00", what: "Coffee beans", why: "Inside every rule" },
-  { stamp: "ask", label: "Ask you", amount: "$80.00", what: "Printer toner", why: "Over your $50.00 limit" },
-  { stamp: "deny", label: "Blocked", amount: "$1,250.00", what: "50 gift cards", why: "Not an allowed category, over budget" },
-] as const;
 
 const delay = (ms: number) => ({ "--d": ms }) as CSSProperties;
-const stagger = (i: number) => ({ "--i": i }) as CSSProperties;
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ notice?: string; bulk?: string }> }) {
   const session = await auth();
@@ -75,29 +69,14 @@ function Landing({ demo }: { demo: boolean }) {
           </Link>
           {demo ? <DemoButton /> : <span className="hero-note">No password. We email you a link.</span>}
         </div>
-        <div className="rise" style={delay(360)}>
-          <HowItWorks />
-        </div>
+        <ul className="hero-promises rise" style={delay(360)}>
+          <li>Agents never see your PayPal</li>
+          <li>PayPal pays the store directly</li>
+          <li>AI can only make a decision stricter</li>
+        </ul>
       </div>
       <div className="hero-slip">
         <Slip className="print" tag="Example" rows={exampleRows} signedBy="R. Mensah" signedOn="Nov 2, 2026" />
-        <div>
-          <p className="section-label decisions-label rise" style={delay(2350)}>
-            How its purchases were decided
-          </p>
-          <ul className="decisions">
-            {exampleDecisions.map((d, i) => (
-              <li className="decision" key={d.what} style={stagger(i)}>
-                <span className={`stamp stamp-${d.stamp}`}>{d.label}</span>
-                <span>
-                  {d.what}
-                  <span className="decision-why">{d.why}</span>
-                </span>
-                <span className="decision-amount">{d.amount}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
       </div>
     </section>
   );
