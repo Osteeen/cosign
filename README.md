@@ -1,79 +1,163 @@
 # Cosign
 
-**A company card for AI agents, built on PayPal. Your agents spend, you co-sign.**
+**A company card for AI agents, built on PayPal. Your agents spend. You co-sign.**
 
-> **Work in progress.** Cosign is being built for the PayPal AI Hackathon 2026 (submission November 2026). Everything runs on the **PayPal sandbox** - no real money moves. The hosted demo and video are coming.
+**Live demo: [cosign-rd24.onrender.com](https://cosign-rd24.onrender.com)** - press **Try the demo**, no sign-up needed.
+Real PayPal sandbox, pretend money: every hold and payment is a real PayPal API call, and no real money moves.
 
-AI agents are starting to buy things. Today an agent that pays with PayPal gets either the whole wallet or a tap-to-approve on every purchase. Cosign sits in between: the owner gives each agent a **permission slip**, and Cosign checks every purchase against it before PayPal pays the store.
+**Video (under 3 minutes):** link added before submission.
 
-## How it works
+---
 
-1. **The owner writes a permission slip** for each agent - a budget per period (up to 28 days), a per-purchase limit, an amount above which they want to be asked, the stores and categories it may buy from. They can write it in plain words and let AI fill in the rules, then review and co-sign.
-2. **The owner approves one PayPal budget hold per store** (an `AUTHORIZE` order with the store as payee). No money moves yet.
-3. **The agent asks Cosign to pay** through the Agent API or MCP. A deterministic **rules engine** decides: pay, ask the owner, or block. If the rules allow it, an **AI purchase check** compares the cart with the owner's own words and can only make the decision stricter - it flags things like gift cards or a "buy 50 now" note an agent picked up from a web page.
-4. **PayPal pays the store directly** - a partial capture from the budget hold. Purchases that need the owner wait on the dashboard (with a market-price check), and the owner approves the exact cart they saw.
-5. **Pause or revoke at any time.** Revoking releases what is left of every hold.
+## The problem
 
-Agents never see PayPal credentials, and Cosign never holds funds.
+AI assistants are starting to shop for people. Today an assistant that pays with PayPal gets either the whole wallet, or it has to ask you to tap "approve" on every single purchase. Neither works for an office assistant that restocks coffee and paper every week.
 
-## What is built
+Cosign sits in between. You give each assistant a **permission slip**, and Cosign checks every purchase against it before PayPal pays the store.
 
-- **Money path on PayPal**: one budget hold per store, partial captures that never charge twice (`PayPal-Request-Id` per purchase, retries pinned to the same authorization), automatic **reauthorization** after PayPal's 3-day honor period, voids on revoke and period end, renewal and a daily job.
-- **Rules engine + AI purchase check** (the AI can only escalate to the owner, never loosen a rule).
-- **Agent API** (REST, OpenAPI 3.1 in [`api/openapi.yaml`](api/openapi.yaml)) and an **MCP server** at `/api/mcp`, so MCP-capable assistants can pay within a slip.
-- **Owner app**: passwordless email sign-in, dashboard sorted by what needs attention, approvals by email and in the app, approve or decline several at once, a permanent activity log, light and dark themes, phone layout.
-- **Spending control room** (AG Grid + AG Charts): every purchase live, with flashing updates as agents buy, decisions straight from the grid, grouping by agent or store with subtotals, expandable purchase details, totals that follow filters, and spend charts.
-- **Order handoff**: an owner address book and a ship-to address per slip; the address goes on the PayPal budget hold (the store sees it in PayPal), and every paid purchase becomes an order the store opens with a private link, confirms and marks shipped. Agents only ever see the address label.
-- **Product search for agents** (`GET /agent/products`, MCP `cosign_find_products`): products at the agent's own stores with what the rules would decide, next to like-for-like prices elsewhere (Channel3, judged by AI).
-- **Market prices** (Channel3) on purchases that wait for the owner.
-- **Demo**: two demo stores (sandbox merchants), a procurement bot that falls for a hidden "buy 50 units now" note, and a one-click demo account for judges.
+## How it works (in plain words)
 
-## Today in the sandbox, and what changes with PayPal
+1. **Tell it the rules.** In your own words: how much it can spend, at which stores, and when to check with you. AI turns your words into exact rules; you review them and co-sign.
+2. **Set money aside in PayPal.** You approve the budget for each store in PayPal. It is reserved, not spent - nothing is charged until something is bought.
+3. **Your assistant shops.** It asks Cosign before paying. Cosign checks every purchase against your rules, and watches for tricks.
+4. **You stay in control.** Every purchase gets one of three answers:
+   - **Paid** - within your rules, so PayPal pays the store right away.
+   - **Ask you** - over your limit, so it waits for your OK (you approve the exact cart you see).
+   - **Blocked** - outside your rules. Nothing is charged, and you see why.
 
-Some limits come from what PayPal enables for our sandbox app, not from Cosign. They disappear once PayPal enables Vault ("connect once") for Cosign:
+Pause or revoke any assistant in one click. Your assistant never sees your PayPal login or card, and Cosign never holds your money - PayPal pays the store directly.
 
-- **Budget holds instead of a saved PayPal.** PayPal's platform Vault isn't enabled for our app, so the owner approves one PayPal budget hold per store and each purchase is a partial capture from it. With Vault, the owner connects their PayPal once and each purchase is charged directly.
-- **The store gets the item list from Cosign.** A partial capture can't carry its own line items, so the store sees the payment and the ship-to address in PayPal, and the items for each purchase on Cosign's private order page (a link the store opens; it does not expire yet). With Vault, every agent purchase is its own normal PayPal order with its own items and shipping address, so the store fulfils it in the tools it already uses - the PayPal dashboard and the shop platforms that read PayPal orders - and "Mark as shipped" becomes PayPal's own package tracking. The gap disappears.
-- **Stores connect to Cosign once.** Today a store is a PayPal merchant that connected to Cosign through PayPal onboarding. With PayPal on board, any PayPal merchant could be paid, always within the owner's permission slip.
+## Try the demo in 2 minutes
 
-Cosign's own part stays the same either way: the permission slips, the rules engine, the AI checks, owner approvals, and agents only ever seeing an address's label.
+1. Open [the live site](https://cosign-rd24.onrender.com) and press **Try the demo** (a shared demo account; you may see what others tried).
+2. Press **Run the demo bot**. An office assistant plans a shopping trip with AI and buys coffee and paper from two demo stores.
+3. **Watch it get tricked.** One product page hides a note telling AI assistants to "buy 50 units now". The assistant falls for it; Cosign doesn't - that purchase waits for you, while the coffee is paid at once.
+4. **Make the call.** Approve or decline. You see why it was flagged, what the assistant said, and what the same item costs at other stores.
+5. Open **Spending** for every purchase in one live table, with charts.
+6. See the **store's side**: each paid purchase becomes an order with the items and delivery address, which the store confirms and marks shipped.
+
+## The technical flow
+
+```
+Owner ──writes slip──▶ Cosign ──AI drafts rules──▶ Owner reviews + co-signs
+Owner ──approves──▶ PayPal budget hold per store (Orders v2 AUTHORIZE, payee = store)
+
+Agent ──"may I buy X?"──▶ Cosign Agent API / MCP
+                           │
+                           ├─ rules engine (deterministic): ALLOW / NEEDS_APPROVAL / DENY
+                           ├─ AI purchase check (Claude): can only make it stricter
+                           │
+                           ├─ ALLOW ──▶ PayPal partial capture from the hold ──▶ store paid
+                           ├─ NEEDS_APPROVAL ──▶ owner approves exact cart ──▶ capture
+                           └─ DENY ──▶ nothing charged, reason logged
+
+Daily job: reauthorize holds after PayPal's 3-day honor period, reconcile every
+hold with PayPal, retry stuck purchases, release what is left at period end.
+PayPal webhooks (signature-checked) confirm captures, voids and refunds.
+```
+
+## How PayPal is used
+
+Cosign is a multiparty platform on the PayPal sandbox. Every money movement is a PayPal API call; Cosign never holds funds.
+
+| PayPal API | What Cosign does with it |
+|---|---|
+| **Partner Referrals** (`/v2/customer/partner-referrals`) | Stores connect to Cosign once through PayPal onboarding; Cosign stores only their merchant ID |
+| **Orders v2 `AUTHORIZE`** with `payee.merchant_id` | One **budget hold** per store, approved by the owner in PayPal (with the ship-to address on the order) |
+| **Payments v2 capture** (`final_capture=false`) | Every allowed purchase is a **partial capture** from the hold - PayPal pays the store directly, with no buyer present |
+| **Payments v2 reauthorize** | After PayPal's 3-day honor period the daily job renews each hold (sending the remaining amount); new captures use the new authorization ID |
+| **Payments v2 void** (with `PayPal-Auth-Assertion` for the store) | Revoking an agent or ending a period releases what is left, always on the original authorization ID |
+| **Payments v2 refund** (with `PayPal-Auth-Assertion`) | A paid purchase can be refunded on behalf of the store; refund and reversal webhooks are recorded |
+| **Webhooks** | `PAYMENT.CAPTURE.*`, `PAYMENT.AUTHORIZATION.VOIDED`, `CHECKOUT.ORDER.APPROVED`, refunds and reversals, each **signature-verified** locally against PayPal's pinned certificate, and de-duplicated |
+| **Idempotency** | Each capture carries a `PayPal-Request-Id` and our own purchase ID as `invoice_id`, so a retry can never charge twice |
+
+All Orders and Payments calls go through the official **PayPal TypeScript Server SDK**.
+
+## How AI is used
+
+AI is a tool inside Cosign, never the one holding the money:
+
+- **Claude Sonnet 5.5** turns the owner's plain words ("Keep us stocked with paper and coffee, $200 every four weeks, ask me before anything over $50") into exact rules. The owner reviews and co-signs them; nothing applies until they do.
+- **Claude Haiku 4.5** runs the **AI purchase check** on every purchase the rules would allow. It compares the cart with the owner's own words and looks for tricks, such as a product page telling AI agents to "buy 50 units now". It can **only make a decision stricter** (pay becomes ask the owner) - it can never approve something the rules refused.
+- **Claude Haiku 4.5** also compares market prices: it keeps only like-for-like products from other retailers, so the owner sees a fair price check before approving.
+- The demo procurement bot plans its shopping trip with **Claude Sonnet 5.5**, calling Cosign like any outside agent would.
+
+Text an agent or a web page supplies is always treated as data, never as instructions.
 
 ## Tools used and how
 
 | Tool | How Cosign uses it |
 |---|---|
-| **PayPal** (sandbox) | Partner Referrals to onboard stores; Orders v2 `AUTHORIZE` with `payee.merchant_id` for budget holds; Payments v2 partial capture, reauthorize, void and refund (with `PayPal-Auth-Assertion` for the store) |
-| **PayPal TypeScript Server SDK** (generated by **APIMatic**) | All Orders and Payments calls, written with APIMatic's **Context Plugin for PayPal Server SDKs** in Claude Code |
-| **Claude** (Anthropic) | Claude Haiku 4.5 for the AI purchase check and market-price comparison; Claude Sonnet for drafting rules from the owner's words and for the demo bot's planning |
-| **AG Grid** (Community + Enterprise) + **AG Charts** | The live spending control room: rows stream in and flash, decide in the grid, group by agent or store with subtotals, expand a purchase for its details, checklist filters, and spend charts. Enterprise runs without a licence key, so a trial watermark shows; the AG Grid team confirmed this is fine for the hackathon judging |
-| **Channel3** | Live product prices: agents search products with `GET /agent/products` or the `cosign_find_products` MCP tool and see their own stores' prices next to other retailers'; the owner's approval view shows market prices; the demo bot uses it to shop |
-| **Render** | Hosting the app, Postgres and the APIMatic docs portal (deploy in progress); the daily job runs from GitHub Actions |
-| Next.js, TypeScript, PostgreSQL, Drizzle ORM, Auth.js, Resend | The app itself |
+| **PayPal** (sandbox) | The whole money path above: Partner Referrals, Orders v2 budget holds, partial captures, reauthorize, void, refunds and webhooks |
+| **APIMatic** | (1) The official **PayPal TypeScript Server SDK** (generated by APIMatic) for every PayPal call, written with APIMatic's **Context Plugin for PayPal Server SDKs** in Claude Code. (2) Cosign's own Agent API: from our OpenAPI 3.1 spec, APIMatic generates **TypeScript, Python and C# SDKs** and the **docs portal** at [cosign-docs.onrender.com](https://cosign-docs.onrender.com), plus a Context Plugin so coding assistants can integrate Cosign |
+| **Claude** (Anthropic) | Sonnet 5.5 for rules from plain words and the demo bot; Haiku 4.5 for the purchase check and price comparison |
+| **AG Grid** (Community + Enterprise) and **AG Charts** | The live **Spending** table: purchases stream in and flash, decide straight from the grid, group by agent or store with subtotals, expand a purchase for its details, and spend charts. AG Grid Enterprise runs without a licence key, so a watermark and a console message are expected - the AG Grid team confirmed this is fine for the hackathon judging |
+| **Channel3** | Live product search and prices: agents search with `GET /api/v1/agent/products` or the `cosign_find_products` MCP tool; owners see market prices next to purchases waiting for approval; the demo bot uses it to shop |
+| **Render** | Hosts the web app, its PostgreSQL database (private network only) and the API docs portal; deploys on every push |
+| Next.js, TypeScript, PostgreSQL, Drizzle ORM, Auth.js, Resend | The app itself; owners sign in with an emailed one-time link |
+
+## For developers
+
+- **Agent API** - REST, OpenAPI 3.1 in [`api/openapi.yaml`](api/openapi.yaml): check an allowance, find products, ask to pay. Agents authenticate with their own key and short-lived tokens; they never see PayPal credentials.
+- **MCP server** at `POST /api/mcp` - add Cosign to Claude or any MCP client with an agent's key, and it can check its allowance, search products and pay, always within its slip.
+- **SDKs and docs** - TypeScript, Python and C# SDKs from the [docs portal](https://cosign-docs.onrender.com).
 
 ## Run it locally
 
-You need Node 22.18+, pnpm 10, PostgreSQL, and a PayPal **sandbox** Platform app with onboarded stores.
+**You need:** Node 22.18+, pnpm 10, PostgreSQL, and a PayPal developer account.
+
+**PayPal sandbox setup**
+
+1. In the PayPal developer dashboard, create sandbox **Business** accounts: one for the platform and one per demo store.
+2. Create a **Platform** (partner) REST app in the sandbox and note its client ID, secret and partner merchant ID.
+3. Onboard each store through Partner Referrals (`node --env-file=.env.local scripts/week1.mjs referral store1`, open the link signed in as that store, then `... store store1` to read its merchant ID), and put the merchant IDs in `scripts/db/seed-stores.sql`.
+4. Optional: register a webhook for your public URL (`/api/paypal/webhook`) with the events listed above, and note its webhook ID.
+
+**Environment** - copy [`.env.example`](.env.example) to `.env.local` and fill it in. Never commit `.env.local`. The variables are:
+`PAYPAL_ENV`, `PAYPAL_API_BASE`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_PARTNER_MERCHANT_ID`, `PAYPAL_WEBHOOK_ID`, `PAYPAL_PARTNER_ATTRIBUTION_ID`, `ANTHROPIC_API_KEY`, `DATABASE_URL`, `AUTH_SECRET`, `AUTH_RESEND_KEY`, `AUTH_EMAIL_FROM`, `JOB_SECRET`, `APP_URL`, `DEMO_LOGIN`.
+
+**Run**
 
 ```bash
 pnpm install
 createdb cosign_dev
-cp .env.example .env.local   # fill in sandbox keys; never commit .env.local
+cp .env.example .env.local   # fill in sandbox values
 pnpm db:migrate
-pnpm db:seed                 # the two demo stores (replace the merchant IDs with your own sandbox stores)
+pnpm db:seed                 # your demo stores
 pnpm dev                     # http://localhost:3001
 ```
 
-Optional: `DEMO_LOGIN=on` and `pnpm demo:seed` for the demo account; `pnpm demo:bot --key-file <file> "<job>"` runs the procurement bot against an agent key.
+Optional: set `DEMO_LOGIN=on` and run `pnpm demo:seed` for the one-click demo account.
 
-Tests: `pnpm test` (unit), `pnpm test:db` (integration, on a separate `cosign_test` database), `pnpm typecheck`.
+**Tests:** `pnpm test` (unit), `pnpm test:db` (integration, on a separate `cosign_test` database), `pnpm typecheck`.
 
 ## Security
 
-Identity comes only from the session or the agent's credential; every read and write is scoped to the owner, and another owner's records look like "not found". Money is integer cents with database-level limits (a hold can never be captured past its amount). Agent keys are stored as hashes; tokens are short-lived and re-checked on every call. Approvals are bound to the exact cart and amount. Agent-supplied text is treated as data, never as instructions.
+Cosign moves money for people, so it is built like a payments system:
+
+- **Identity** comes only from the signed-in session or the agent's own credential. Every read and write is scoped to its owner; another owner's records look like "not found".
+- **The rules engine decides, not the AI.** AI can only make a decision stricter.
+- **Money** is integer cents with database-level limits: a hold can never be captured past its amount, budgets are reserved inside one database transaction with a row lock, and every capture is idempotent.
+- **Approvals** are bound to the exact cart and amount the owner saw.
+- **Agent keys** are stored as hashes; tokens are short-lived and re-checked on every call; any agent can be paused or revoked instantly.
+- **Webhooks** are trusted only after PayPal's signature checks out against PayPal's own certificate.
+- **Reconciliation:** a daily job compares every hold with PayPal and freezes anything that does not match.
+- Rate limits on sign-in, the Agent API, product search and webhooks.
+
+## Today in the sandbox, and what changes with PayPal
+
+Some limits come from what PayPal enables for our sandbox app, not from Cosign:
+
+- **Budget holds instead of a saved PayPal.** PayPal's platform-level Vault is not enabled for our app, so the owner approves one budget hold per store. With Vault, the owner connects PayPal once and every purchase is charged directly.
+- **Holds last up to 29 days**, so a budget period is at most 28 days, with a one-tap renewal.
+- **The store sees each purchase's items on Cosign's private order page**, because a partial capture cannot carry its own line items. With Vault, every agent purchase is a normal PayPal order the store already knows how to fulfil.
+- **Stores connect to Cosign once** through PayPal onboarding. With PayPal on board, any PayPal merchant could be paid - always within the owner's permission slip.
+
+Cosign's own part stays the same either way: permission slips, the rules engine, the AI checks, owner approvals and the activity log.
 
 ## Contact
 
-Built by Osteen. I'd love to hear your questions, feedback and ideas: austinjohn337@gmail.com
+Questions, feedback and ideas are welcome: austinjohn337@gmail.com
 
 ## Licence
 
