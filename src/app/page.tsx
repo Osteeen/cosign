@@ -18,7 +18,7 @@ import { Slip } from "@/components/slip";
 import { Topbar } from "@/components/topbar";
 
 const exampleRows = [
-  { label: "Agent", value: "Office procurement bot" },
+  { label: "Agent", value: "Office assistant" },
   {
     label: "In your words",
     value: <span className="slip-quote">&ldquo;Keep us stocked with paper and coffee. $200 every four weeks, and ask me before anything over $50.&rdquo;</span>,
@@ -26,7 +26,7 @@ const exampleRows = [
   { label: "Budget", value: "$200.00 every 28 days" },
   { label: "Per purchase", value: "Up to $100.00" },
   { label: "Ask me above", value: "$50.00" },
-  { label: "Stores", value: "Paper Co  $120.00 held\nBean Supply  $80.00 held" },
+  { label: "Stores", value: "Paper Co  $120.00 set aside\nBean Supply  $80.00 set aside" },
   { label: "Categories", value: "Office supplies, groceries" },
 ];
 
@@ -60,8 +60,8 @@ function Landing({ demo }: { demo: boolean }) {
       <div className="hero-copy">
         <h1 className="hero-title rise">Your agents spend. You co-sign.</h1>
         <p className="hero-lede rise" style={delay(120)}>
-          Give each AI agent a permission slip: a budget, the stores it can use, and what it must ask you about. Cosign checks every
-          purchase against it, and PayPal pays the store directly.
+          Let your AI assistants buy what you need, within limits you set. Small purchases go through, bigger ones wait for your OK, and
+          anything off-limits is stopped. PayPal pays the store - your assistant never touches your card.
         </p>
         <div className="hero-actions rise" style={delay(240)}>
           {demo ? (
@@ -81,9 +81,9 @@ function Landing({ demo }: { demo: boolean }) {
           )}
         </div>
         <ul className="hero-promises rise" style={delay(360)}>
-          <li>Agents never see your PayPal</li>
-          <li>PayPal pays the store directly</li>
-          <li>AI can only make a decision stricter</li>
+          <li>Your PayPal stays private</li>
+          <li>You set the limits</li>
+          <li>Pause any assistant in one click</li>
         </ul>
       </div>
       <div className="hero-slip">

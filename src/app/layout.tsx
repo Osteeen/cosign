@@ -14,7 +14,7 @@ const signature = Mrs_Saint_Delafield({ subsets: ["latin"], weight: "400", varia
 
 const TITLE = "Cosign - Your agents spend. You co-sign.";
 const DESCRIPTION =
-  "A company card for AI agents, built on PayPal. Give each agent a permission slip - Cosign checks every purchase, and PayPal pays the store directly. Try the demo, no sign-up.";
+  "Let your AI assistants shop for you, within limits you set. Cosign approves small buys, asks you about big ones and blocks the rest. PayPal pays the store. Try the demo free.";
 
 // Link previews need absolute URLs, so they are built from the public address.
 export const metadata: Metadata = {
