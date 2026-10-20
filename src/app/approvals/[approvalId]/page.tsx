@@ -45,7 +45,7 @@ export default async function ApprovalPage({ params, searchParams }: { params: P
             Your agents
           </Link>
           <Notice code={notice} />
-          <h1 className="panel-title">{approval.status === "PENDING" ? "Needs your OK" : "Purchase request"}</h1>
+          <h1 className="panel-title">{approval.status === "PENDING" ? "Waiting for your OK" : "Purchase request"}</h1>
           {approval.status === "PENDING" ? (
             <ApprovalCard
               approvalId={approval.id}

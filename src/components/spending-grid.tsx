@@ -56,7 +56,7 @@ const theme = themeQuartz.withParams({
 const STAMP: Record<SpendingRow["outcome"], { tone: string; label: string }> = {
   Paid: { tone: "allow", label: "Paid" },
   "Waiting for you": { tone: "ask", label: "Ask you" },
-  Confirming: { tone: "ask", label: "Checking" },
+  Confirming: { tone: "ask", label: "Confirming" },
   Blocked: { tone: "deny", label: "Blocked" },
   Declined: { tone: "deny", label: "Declined" },
   Expired: { tone: "deny", label: "Expired" },
@@ -78,7 +78,7 @@ function PurchaseDetail({ data }: { data: SpendingRow }) {
     ["What", data.items],
     ["Why", data.why || "-"],
     ["AI check", data.aiCheck],
-    ["Market (Channel3)", data.market || "Not checked - only purchases that wait for you are price-checked"],
+    ["Market (Channel3)", data.market || "Not checked - only purchases waiting for you are price-checked"],
   ];
   return (
     <div className="purchase-detail">
@@ -264,7 +264,7 @@ export function SpendingGrid({ rows: initial }: { rows: SpendingRow[] }) {
           p.node.group ? (
             <span className="grid-group-label">{String(p.value ?? "")}</span>
           ) : p.node.rowPinned ? (
-            <span className="grid-total-label">paid</span>
+            <span className="grid-total-label">Paid</span>
           ) : p.data ? (
             <span className={`stamp stamp-${STAMP[p.data.outcome].tone}`} title={p.data.outcome}>
               {STAMP[p.data.outcome].label}
@@ -309,7 +309,7 @@ export function SpendingGrid({ rows: initial }: { rows: SpendingRow[] }) {
     return (
       <div className="empty">
         <h2>No purchases yet</h2>
-        <p>When your agents ask to pay a store, every request shows up here - paid, waiting for you, or blocked.</p>
+        <p>When your AI assistants ask to pay a store, each request appears here - Paid, Ask you, or Blocked.</p>
       </div>
     );
   }

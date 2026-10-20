@@ -349,7 +349,7 @@ async function stillUnconfirmed(row: SpendRow, issue: string | null): Promise<Sp
     spendRequestId: row.id,
     type: "PAYMENT_UNCONFIRMED",
     amountCents: row.totalCents,
-    summary: `Waiting for PayPal to confirm ${formatUsd(row.totalCents)}; the amount stays reserved`,
+    summary: `Waiting for PayPal to confirm ${formatUsd(row.totalCents)}. The amount stays reserved.`,
     data: { issue },
   });
   return row;
@@ -403,7 +403,7 @@ async function settle(row: SpendRow, captureId: string | null, failure: string |
       spendRequestId: row.id,
       type: captureId ? "PAYMENT_CAPTURED" : "PAYMENT_FAILED",
       amountCents: row.totalCents,
-      summary: captureId ? `Paid ${formatUsd(row.totalCents)} to the store` : `PayPal did not take ${formatUsd(row.totalCents)}; nothing was charged`,
+      summary: captureId ? `Paid ${formatUsd(row.totalCents)} to the store` : `PayPal did not take ${formatUsd(row.totalCents)}. Nothing was charged.`,
       data: failure ? { issue: failure } : undefined,
     });
     return updated!;
@@ -441,7 +441,7 @@ async function orderShippedButUnpaid(tx: Tx, row: SpendRow) {
     spendRequestId: row.id,
     type: "PAYMENT_NEEDS_REVIEW",
     amountCents: row.totalCents,
-    summary: `The store had already shipped this order when PayPal took back ${formatUsd(row.totalCents)}; check it with the store`,
+    summary: `The store had already shipped this order when PayPal took back ${formatUsd(row.totalCents)}. Check with the store.`,
   });
 }
 
@@ -463,11 +463,11 @@ export async function captureConfirmedByPayPal(spendId: unknown, captureId: stri
     if (row.paypalCaptureId === captureId) return (await confirmOrderPayment(row.id)) ? "payment_confirmed" : "already_paid";
     // Money left the hold that Cosign never counted: stop the hold from
     // spending any more until the owner has looked.
-    await freezeHold(row.holdId!, `PayPal reports a second payment for a purchase (${amountCents === null ? "amount unknown" : formatUsd(amountCents)}); spending from this hold is paused until you check it with the store`);
+    await freezeHold(row.holdId!, `PayPal reports a second payment for a purchase (${amountCents === null ? "amount unknown" : formatUsd(amountCents)}). Spending from this hold is paused until you check with the store.`);
     return "flagged_second_capture";
   }
   if (amountCents !== row.totalCents) {
-    await freezeHold(row.holdId!, `PayPal reports ${amountCents === null ? "an unknown amount" : formatUsd(amountCents)} for a ${formatUsd(row.totalCents)} purchase; spending from this hold is paused until you check it with the store`);
+    await freezeHold(row.holdId!, `PayPal reports ${amountCents === null ? "an unknown amount" : formatUsd(amountCents)} for a ${formatUsd(row.totalCents)} purchase. Spending from this hold is paused until you check with the store.`);
     return "flagged_amount_mismatch";
   }
   if (row.status !== "PROCESSING") {
@@ -503,7 +503,7 @@ export async function captureFailedAtPayPal(spendId: unknown, captureId: string)
       spendRequestId: row.id,
       type: "PAYMENT_REVERSED",
       amountCents: row.totalCents,
-      summary: `PayPal did not complete ${formatUsd(row.totalCents)}; nothing was charged${order === "cancelled" ? " and the store's order was cancelled" : ""}`,
+      summary: `PayPal did not complete ${formatUsd(row.totalCents)}. Nothing was charged${order === "cancelled" ? " and the store's order was cancelled" : ""}.`,
     });
     if (order === "shipped") await orderShippedButUnpaid(tx, row);
     return order === "shipped" ? "reversed_flagged" : "reversed";
@@ -574,14 +574,14 @@ async function correctToPaid(row: SpendRow, captureId: string, pending: boolean)
         spendRequestId: current.id,
         type: "PAYMENT_NEEDS_REVIEW",
         amountCents: current.totalCents,
-        summary: `PayPal had taken ${formatUsd(current.totalCents)} for this purchase after Cosign recorded it as not paid; it now counts as paid`,
+        summary: `PayPal took ${formatUsd(current.totalCents)} for this purchase after Cosign recorded it as not paid. It now counts as paid.`,
       });
       return true;
     });
     return corrected;
   } catch {
     // Most likely the hold's own limit (captured + reserved <= amount).
-    await freezeHold(row.holdId!, `PayPal took ${formatUsd(row.totalCents)} that doesn't fit this hold in Cosign; spending from it is paused until you check it with the store`);
+    await freezeHold(row.holdId!, `PayPal took ${formatUsd(row.totalCents)} that does not fit this hold in Cosign. Spending from it is paused until you check with the store.`);
     return false;
   }
 }
@@ -631,7 +631,7 @@ export async function reconcileHolds(): Promise<{ checked: number; corrected: nu
     const paypalTotal = captures.reduce((sum, c) => sum + c.amountCents, 0);
     const [now] = await db.select({ captured: holds.capturedCents }).from(holds).where(eq(holds.id, hold.id));
     if (now && now.captured !== paypalTotal) {
-      await freezeHold(hold.id, `PayPal shows ${formatUsd(paypalTotal)} paid from this hold, Cosign ${formatUsd(now.captured)}; spending from it is paused until you check it`);
+      await freezeHold(hold.id, `PayPal shows ${formatUsd(paypalTotal)} paid from this hold, Cosign ${formatUsd(now.captured)}. Spending from it is paused until you check it.`);
       out.frozen++;
     }
   }

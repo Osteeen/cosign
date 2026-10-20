@@ -42,7 +42,7 @@ export function ConnectAgent({ agentId, apiKey, appUrl }: { agentId: string; api
   const snippets: Record<Tab, { label: string; hint: string; code: string }> = {
     claude: {
       label: "AI assistant / MCP",
-      hint: "Run this once in a terminal to add Cosign to your AI assistant (this command is for Claude Code; any MCP client works). The assistant can then check its allowance and pay PayPal merchants within the slip.",
+      hint: "Run this once in a terminal to connect Cosign to your AI assistant. This command is for Claude Code, but any MCP client works. Your assistant can check its allowance and pay PayPal stores within the permission slip.",
       code: `claude mcp add --transport http cosign ${appUrl}/api/mcp \\\n  --header "Authorization: Bearer ${apiKey}"`,
     },
     code: {
@@ -107,7 +107,7 @@ curl -s -X POST ${appUrl}/api/v1/agent/spend-requests \\
         <span className="connection-dot" aria-hidden="true" />
         {connectedAt
           ? `Connected - first request at ${new Date(connectedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
-          : "Waiting for your agent's first request..."}
+          : "Waiting for your AI assistant's first request..."}
       </p>
     </section>
   );

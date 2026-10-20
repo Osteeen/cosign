@@ -9,6 +9,7 @@ import { spendRequests } from "@/db/schema";
 import { judgeMarket } from "@/lib/ai/market-check";
 import { searchMarket, type MarketOffer } from "@/lib/market/channel3";
 import { rateLimit } from "@/lib/api";
+import { formatUsd } from "@/lib/money";
 
 const MAX_ITEMS = 3;
 // A misbehaving agent must not burn the Channel3 quota or AI spend.
@@ -53,7 +54,7 @@ export function marketSummary(check: MarketCheck | null | undefined): string | n
   if (!first) return null;
   if (first.verdict === "none") return "No comparable listings on Channel3";
   const word = first.verdict === "below" ? "Below market price" : first.verdict === "above" ? "Above market price" : "About market price";
-  return `${word} - ${first.offers.map((o) => `${o.domain} $${o.price.toFixed(2)}`).join(", ")}`;
+  return `${word} - ${first.offers.map((o) => `${o.domain} ${formatUsd(Math.round(o.price * 100))}`).join(", ")}`;
 }
 
 // What an approval card shows: the summary line and the model's short note.

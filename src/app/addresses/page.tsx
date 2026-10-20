@@ -28,8 +28,8 @@ export default async function AddressesPage({ searchParams }: { searchParams: Pr
           ) : null}
           <h1 className="panel-title">Shipping addresses</h1>
           <p className="panel-text">
-            Choose one on each permission slip. When an agent pays, the store gets the order with this address, and sees it in PayPal too. Agents only
-            ever see the label.
+            Choose one for each permission slip. When an agent pays, the store gets the order with this address and sees it in PayPal too. Agents only
+            see the label.
           </p>
           <Notice code={notice} />
 
@@ -46,7 +46,7 @@ export default async function AddressesPage({ searchParams }: { searchParams: Pr
                     {addressSummary(a)}
                   </p>
                   {demo ? (
-                    <p className="muted">A sample address shared by everyone using the demo, so it can't be changed.</p>
+                    <p className="muted">A sample address shared by everyone in the demo. It can't be changed.</p>
                   ) : (
                     <div className="toolbar">
                       <details className="inline-edit">
@@ -58,7 +58,7 @@ export default async function AddressesPage({ searchParams }: { searchParams: Pr
                         />
                       </details>
                       <ConfirmDialog trigger="Remove" title={`Remove "${a.label}"?`} confirmLabel="Remove address" pendingLabel="Removing" action={archiveAddressAction}>
-                        <p>Orders already sent keep their copy of this address. A permission slip that ships here must be changed first.</p>
+                        <p>Orders already sent keep their copy of this address. Change any permission slip that ships here first.</p>
                         <input type="hidden" name="addressId" value={a.id} />
                       </ConfirmDialog>
                     </div>

@@ -51,7 +51,7 @@ export async function checkIntent(input: {
 }): Promise<IntentResult> {
   // Plain instructions aimed at an AI: always the owner's call, no model needed.
   const aimed = aimedAtAi([input.purpose, ...input.items.map((i) => i.name)]);
-  if (aimed) return { verdict: "FLAGGED", summary: `The agent's text contains an instruction aimed at an AI ("${aimed}"), a sign it was manipulated, for example by a web page.` };
+  if (aimed) return { verdict: "FLAGGED", summary: `The agent's text includes an instruction for an AI ("${aimed}"). It may have come from a web page trying to influence it.` };
 
   if (!process.env.ANTHROPIC_API_KEY) {
     // Not configured: in production that is unsafe, so ask the owner; locally, skip.

@@ -124,7 +124,7 @@ export function SpendingCharts({ shown, agentOrder }: { shown: SpendingRow[]; ag
         y: {
           type: "number",
           position: "left",
-          label: { color: t.soft, formatter: ({ value }: { value: number }) => `$${value}` },
+          label: { color: t.soft, formatter: ({ value }: { value: number }) => `$${value.toLocaleString("en-US")}` },
           gridLine: { style: [{ stroke: t.rule, lineDash: [2, 4] }] },
         },
       },
@@ -161,7 +161,7 @@ export function SpendingCharts({ shown, agentOrder }: { shown: SpendingRow[]; ag
       ],
       axes: {
         x: { type: "category", position: "left", label: { color: t.ink }, line: { stroke: t.rule } },
-        y: { type: "number", position: "bottom", label: { color: t.soft, formatter: ({ value }: { value: number }) => `$${value}` }, gridLine: { style: [{ stroke: t.rule, lineDash: [2, 4] }] } },
+        y: { type: "number", position: "bottom", label: { color: t.soft, formatter: ({ value }: { value: number }) => `$${value.toLocaleString("en-US")}` }, gridLine: { style: [{ stroke: t.rule, lineDash: [2, 4] }] } },
       },
       legend: { enabled: false },
     } as AgCartesianChartOptions;
@@ -171,7 +171,7 @@ export function SpendingCharts({ shown, agentOrder }: { shown: SpendingRow[]; ag
   if (paid.length === 0) {
     return (
       <div className="spend-charts">
-        <p className="muted spend-charts-empty">No paid purchases in this view yet - charts appear once an agent pays a store.</p>
+        <p className="muted spend-charts-empty">No paid purchases here yet - charts appear once an agent pays a store.</p>
       </div>
     );
   }

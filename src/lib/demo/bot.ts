@@ -63,12 +63,12 @@ export async function* runDemoBot(agent: { id: string; status: string }): AsyncG
   const allowance = await getAllowance(agent);
   const slip = allowance.slip;
   if (!slip || slip.stores.length === 0) {
-    yield { t: "done", text: "I have no approved budget holds yet, so I can't buy anything." };
+    yield { t: "done", text: "I do not have approved budget holds yet, so I cannot buy anything." };
     return;
   }
   yield {
     t: "line",
-    text: `${formatUsd(slip.remaining_this_period.amount_cents)} left this period, up to ${formatUsd(slip.per_purchase_max.amount_cents)} per purchase, the owner asked above ${formatUsd(slip.approve_above.amount_cents)}`,
+    text: `${formatUsd(slip.remaining_this_period.amount_cents)} left this period, up to ${formatUsd(slip.per_purchase_max.amount_cents)} per purchase, and the owner wants to be asked above ${formatUsd(slip.approve_above.amount_cents)}`,
   };
   const allowedStores = DEMO_STORES.filter((s) => slip.stores.some((a) => a.store.name === s.name));
 
@@ -91,7 +91,7 @@ export async function* runDemoBot(agent: { id: string; status: string }): AsyncG
     })
     .filter((p) => p !== null);
   if (picks.length === 0) {
-    yield { t: "done", text: "Nothing in the allowed stores fits the job." };
+    yield { t: "done", text: "Nothing at the allowed stores fits the job." };
     return;
   }
   for (const p of picks) yield { t: "line", text: `${p.quantity} x ${p.product.name} - ${p.why}` };
@@ -105,13 +105,13 @@ export async function* runDemoBot(agent: { id: string; status: string }): AsyncG
       const page = await fetch(url, { signal: AbortSignal.timeout(8000), cache: "no-store" });
       pageText = text(await page.text());
     } catch {
-      yield { t: "line", text: `Could not open the ${p.product.name} page; going with the plan.`, tone: "muted" };
+      yield { t: "line", text: `Could not open the ${p.product.name} page. Going with the plan.`, tone: "muted" };
       continue;
     }
     const note = quantityNote(pageText);
     if (note) {
       yield { t: "line", text: `Note on the page: "${note.sentence}"`, tone: "warn" };
-      yield { t: "line", text: `Trusting the store: quantity ${p.quantity} -> ${note.quantity}`, tone: "warn" };
+      yield { t: "line", text: `Using the store's advice: quantity ${p.quantity} -> ${note.quantity}`, tone: "warn" };
       p.quantity = note.quantity;
       notes.set(p.product.slug, note.sentence);
     } else {
@@ -133,7 +133,7 @@ export async function* runDemoBot(agent: { id: string; status: string }): AsyncG
     }));
     const total = items.reduce((s, i) => s + i.quantity * i.unit_amount_cents, 0);
     const advice = mine.map((p) => notes.get(p.product.slug)).filter(Boolean);
-    const purpose = [`Restock for the office: ${mine.map((p) => p.product.name.split(",")[0]).join(" and ")}.`, ...advice.map((a) => `Store's advice: "${a}"`)].join(" ");
+    const purpose = [`Office restock: ${mine.map((p) => p.product.name.split(",")[0]).join(" and ")}.`, ...advice.map((a) => `Store advice: "${a}"`)].join(" ");
 
     yield { t: "line", text: `${store.name}: ${items.map((i) => `${i.quantity} x ${i.name}`).join(", ")} = ${formatUsd(total)}` };
     try {
@@ -144,15 +144,17 @@ export async function* runDemoBot(agent: { id: string; status: string }): AsyncG
         purpose: purpose.slice(0, 500),
       });
       const reasons = ((row.decision as { reasons?: { message: string }[] }).reasons ?? []).map((r) => r.message).join(" ");
-      if (row.status === "COMPLETED") yield { t: "line", text: "PAID through PayPal from the budget hold.", tone: "ok" };
-      else if (row.status === "PENDING_APPROVAL") yield { t: "line", text: `WAITING FOR THE OWNER - ${reasons}`, tone: "warn" };
-      else if (row.status === "DENIED") yield { t: "line", text: `BLOCKED - ${reasons}`, tone: "bad" };
-      else yield { t: "line", text: `${row.status} ${reasons}`, tone: "muted" };
+      if (row.status === "COMPLETED") yield { t: "line", text: "Paid through PayPal using the budget hold.", tone: "ok" };
+      else if (row.status === "PENDING_APPROVAL") yield { t: "line", text: `Waiting for the owner - ${reasons}`, tone: "warn" };
+      else if (row.status === "DENIED") yield { t: "line", text: `Blocked - ${reasons}`, tone: "bad" };
+      else if (row.status === "PROCESSING") yield { t: "line", text: "Waiting for PayPal to confirm the payment.", tone: "muted" };
+      else if (row.status === "PAYMENT_FAILED") yield { t: "line", text: "PayPal could not take the payment. Nothing was charged.", tone: "bad" };
+      else yield { t: "line", text: `Not paid - ${reasons}`, tone: "muted" };
     } catch (e) {
       // Only Cosign's own plain-language errors are shown; anything else stays in the server log.
       if (!(e instanceof ServiceError)) console.error(`[demo-bot] ${e instanceof Error ? e.name : "error"}`);
-      yield { t: "line", text: e instanceof ServiceError ? `Cosign refused the request: ${e.message}` : "Something went wrong asking Cosign to pay. Nothing was charged.", tone: "bad" };
+      yield { t: "line", text: e instanceof ServiceError ? `Cosign could not complete the payment: ${e.message}` : "Something went wrong while Cosign was trying to pay. Nothing was charged.", tone: "bad" };
     }
   }
-  yield { t: "done", text: "Done. Anything waiting is now on your dashboard and in the spending table." };
+  yield { t: "done", text: "Done. Anything waiting is on your dashboard and in the spending table." };
 }

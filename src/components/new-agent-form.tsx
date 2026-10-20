@@ -22,8 +22,8 @@ export function NewAgentForm({ appUrl }: { appUrl: string }) {
           <p className="field-label">API key - copy it now</p>
           <code className="key-value">{key}</code>
           <p className="muted">
-            This is the only time we show it. Give it to your agent; it uses the key to ask Cosign before it pays. If you lose it, revoke the
-            agent and add a new one.
+            This is the only time you will see it. Give it to your AI assistant. It uses the key to check with Cosign before paying. If you lose
+            it, revoke the agent and add a new one.
           </p>
           <CopyButton value={key} label="Copy key" />
         </div>
@@ -38,7 +38,7 @@ export function NewAgentForm({ appUrl }: { appUrl: string }) {
   return (
     <>
       <h1 className="panel-title">Add an agent</h1>
-      <p className="panel-text">Name the AI agent you want to let spend. You will get a key for it, then give it a permission slip.</p>
+      <p className="panel-text">Name the AI assistant you want to let spend. You will get a key for it, then give it a permission slip.</p>
     <form
       action={formAction}
       className="slip panel-stack"

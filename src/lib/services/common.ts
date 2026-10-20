@@ -18,7 +18,9 @@ export class ServiceError extends Error {
   }
 }
 
-export const notFound = (what: string) => new ServiceError(404, "not_found", `${what} not found.`);
+// "We could not find that permission slip." - plain words; "Spend request" reads as "purchase".
+export const notFound = (what: string) =>
+  new ServiceError(404, "not_found", `We could not find that ${what === "Spend request" ? "purchase" : what.toLowerCase()}.`);
 
 export async function logActivity(
   tx: Tx,

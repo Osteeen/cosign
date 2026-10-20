@@ -70,7 +70,7 @@ ${input.ownerWords}
       ],
     });
     if (response.stop_reason === "refusal" || !response.parsed_output) {
-      return { ok: false, message: "Couldn't turn that into rules. Try saying it more simply, or fill in the fields yourself." };
+      return { ok: false, message: "We could not turn that into rules. Try saying it more simply, or fill in the fields yourself." };
     }
     const d = response.parsed_output;
     // Keep only real stores and in-range values; the form and server validate again.
@@ -87,6 +87,6 @@ ${input.ownerWords}
   } catch (e) {
     const kind = e instanceof Anthropic.APIError ? `HTTP ${e.status}` : e instanceof Error ? e.name : "error";
     console.error(`[draft-slip] failed (${kind})`);
-    return { ok: false, message: "Drafting isn't available right now. Fill in the fields yourself, or try again shortly." };
+    return { ok: false, message: "Drafting is not available right now. Fill in the fields yourself, or try again shortly." };
   }
 }

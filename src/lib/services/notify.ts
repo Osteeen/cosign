@@ -45,7 +45,7 @@ export async function notifyApprovalNeeded(spendRequestId: string): Promise<void
       agentId: row.spend.agentId,
       spendRequestId,
       type: sent ? "APPROVAL_EMAILED" : "EMAIL_FAILED",
-      summary: sent ? `Emailed you about ${formatUsd(row.approval.totalCents)}` : `Could not email you about ${formatUsd(row.approval.totalCents)}; it is waiting on your dashboard`,
+      summary: sent ? `Emailed you about ${formatUsd(row.approval.totalCents)}` : `Could not email you about ${formatUsd(row.approval.totalCents)}. It is waiting on your dashboard.`,
     });
   } catch (e) {
     console.error("[notify] approval email", e instanceof Error ? e.message : e);

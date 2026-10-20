@@ -22,7 +22,7 @@ function messageFor(el: Field): string | null {
   if (v.rangeUnderflow || v.rangeOverflow) {
     const min = (el as HTMLInputElement).min;
     const max = (el as HTMLInputElement).max;
-    return min && max ? `Enter a number from ${min} to ${max}.` : "Enter a number in range.";
+    return min && max ? `Enter a number from ${min} to ${max}.` : "Enter a number in the allowed range.";
   }
   if (v.badInput || v.stepMismatch) return "Enter a whole number.";
   if (v.tooLong) return `Keep it under ${(el as HTMLInputElement).maxLength} characters.`;

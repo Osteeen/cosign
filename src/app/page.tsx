@@ -61,7 +61,7 @@ function Landing({ demo }: { demo: boolean }) {
         <h1 className="hero-title rise">Your agents spend. You co-sign.</h1>
         <p className="hero-lede rise" style={delay(120)}>
           Let your AI assistants buy what you need, within limits you set. Small purchases go through, bigger ones wait for your OK, and
-          anything off-limits is stopped. PayPal pays the store - your assistant never touches your card.
+          off-limits purchases are stopped. PayPal pays the store - your assistant never sees your card.
         </p>
         <div className="hero-actions rise" style={delay(240)}>
           {demo ? (
@@ -76,7 +76,7 @@ function Landing({ demo }: { demo: boolean }) {
               <Link href="/sign-in" className="button button-primary">
                 Sign in to Cosign
               </Link>
-              <span className="hero-note">No password. We email you a link.</span>
+              <span className="hero-note">No password. We&apos;ll email you a link.</span>
             </>
           )}
         </div>
@@ -131,7 +131,7 @@ function toCards(
         meta: !slip
           ? "No permission slip"
           : holdsAwaiting > 0 && holdsActive === 0
-            ? "Slip co-signed, budget not placed yet"
+            ? "Permission slip co-signed. Budget not placed yet."
             : `${formatUsd(spentCents)} of ${formatUsd(slip.periodBudgetCents)} spent this period`,
       },
     };

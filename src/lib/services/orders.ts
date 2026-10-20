@@ -111,7 +111,7 @@ async function storeStep(orderId: string, token: string, step: "confirm" | "ship
     const [current] = await tx.select().from(orders).where(eq(orders.id, orderId)).for("update");
     if (!current || !spend) throw notFound("Order");
     if (current.status === "CANCELLED" || spend.status !== "COMPLETED") return current;
-    if (current.paymentPending) throw new ServiceError(409, "payment_pending", "PayPal has not confirmed this payment yet. Please don't ship until it does.");
+    if (current.paymentPending) throw new ServiceError(409, "payment_pending", "PayPal has not confirmed this payment yet. Please do not ship until it does.");
     if (step === "confirm") {
       if (current.status !== "SENT") return current;
       const [updated] = await tx.update(orders).set({ status: "SEEN", seenAt: new Date() }).where(eq(orders.id, orderId)).returning();

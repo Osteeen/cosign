@@ -43,13 +43,15 @@ export function approvalEmail(input: {
   ].join("\n");
   const html = emailLayout({
     preheader: `${input.agentName} is asking before it pays ${amount} to ${input.storeName}.`,
-    header: "Needs your OK",
+    header: "Waiting for your OK",
     title: `${input.agentName} wants to pay ${amount}`,
     intro: flagged
-      ? "Cosign's purchase check flagged this, so it is waiting for you. Only approve it if you expected it."
-      : `It is over your "ask me above" limit, so it is waiting for you.`,
+      ? "Cosign's purchase check flagged this. It is waiting for you. Only approve it if you expected it."
+      : input.reasons.some((r) => r.code === "ABOVE_APPROVAL_THRESHOLD")
+        ? `It is over your "ask me above" limit, so it is waiting for you.`
+        : "Cosign is checking with you before it pays, so it is waiting for you.",
     rows: [
-      ["Store", `${input.storeName} (demo store)`],
+      ["Store", `${input.storeName} - Demo store (PayPal sandbox)`],
       ["What", what],
       ["Why asking", why],
       ["Agent said", `"${purpose}"`],

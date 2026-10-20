@@ -30,7 +30,7 @@ export default async function NewSlipPage({ params }: { params: Promise<{ agentI
             {agent.name}
           </Link>
           <h1 className="panel-title">Permission slip for {agent.name}</h1>
-          <p className="panel-text">Set what it may spend and where. You co-sign it, then approve a PayPal budget hold for each store.</p>
+          <p className="panel-text">Set what it may spend and where. Co-sign it, then approve a PayPal budget hold for each store.</p>
           <SlipForm
             agentId={agentId}
             agentName={agent.name}

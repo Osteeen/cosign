@@ -132,8 +132,8 @@ async function holdVoided(authorizationId: string): Promise<string> {
     type: "HOLD_RELEASED",
     summary:
       row.hold.periodIndex > row.slip.currentPeriodIndex
-        ? `PayPal released the renewal hold at ${row.store}; approve it again before the next period starts`
-        : `PayPal released the budget hold at ${row.store}; your agent can no longer pay that store this period`,
+        ? `PayPal released the renewal hold at ${row.store}. Approve it again before the next period starts.`
+        : `PayPal released the budget hold at ${row.store}. Your agent can no longer pay that store this period.`,
     data: { holdId: row.hold.id, by: "paypal" },
   });
   return "hold_released";

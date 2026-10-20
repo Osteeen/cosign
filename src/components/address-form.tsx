@@ -39,7 +39,7 @@ export function AddressForm({ initial = EMPTY, back, submitLabel }: { initial?: 
             Label
           </label>
           <input id={`label-${key}`} name="label" className="field-input" required maxLength={40} defaultValue={initial.label} placeholder="Office" autoComplete="off" data-label="label" {...invalidProps("label", errors)} />
-          <p className="field-help">The only part your agents ever see.</p>
+          <p className="field-help">The only part your agents see.</p>
           <FieldError name="label" errors={errors} />
         </div>
         <div className="field">

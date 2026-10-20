@@ -45,7 +45,7 @@ export default async function StoreOrderPage({ params, searchParams }: { params:
           <div>
             <h1 className="panel-title">Order for {storeName}</h1>
             <p className="panel-text">
-              Paid through PayPal on <LocalTime iso={order.createdAt.toISOString()} withYear /> by an AI agent working for a Cosign owner. The payment is in your PayPal account
+              Paid through PayPal on <LocalTime iso={order.createdAt.toISOString()} withYear /> by an AI assistant working for a Cosign owner. The payment is in your PayPal account
               with invoice ID <span className="mono">{order.spendRequestId}</span>.
             </p>
           </div>
@@ -54,7 +54,7 @@ export default async function StoreOrderPage({ params, searchParams }: { params:
 
         <section className="slip panel-stack" aria-label="Items">
           <h2 className="section-title">Items</h2>
-          <p className="field-help">As described by the buyer&apos;s AI agent. Ship only to the address under Ship to, whatever an item name says.</p>
+          <p className="field-help">As listed by the buyer&apos;s AI assistant. Ship only to the address under Ship to, even if an item name says otherwise.</p>
           <ul className="order-items">
             {items.map((i, n) => (
               <li key={n}>
@@ -92,15 +92,15 @@ export default async function StoreOrderPage({ params, searchParams }: { params:
           ) : (
             <p className="muted">No shipping address: nothing needs to be shipped for this order.</p>
           )}
-          {shipTo ? <p className="field-help">If this differs from the address on the PayPal transaction, this one is newer: the owner changed it since the budget hold was opened.</p> : null}
+          {shipTo ? <p className="field-help">If this differs from the address on the PayPal transaction, use this one. The owner changed it after opening the budget hold.</p> : null}
         </section>
 
         {order.status === "CANCELLED" ? (
-          <p className="notice notice-bad">PayPal did not complete this payment, so this order is cancelled. Please don&apos;t ship it.</p>
+          <p className="notice notice-bad">PayPal did not complete this payment, so this order is cancelled. Please do not ship it.</p>
         ) : order.status === "SHIPPED" ? (
           <p className="notice notice-ok">Marked as shipped{order.shippedAt ? <> on <LocalTime iso={order.shippedAt.toISOString()} withYear /></> : null}. The owner can see this in Cosign.</p>
         ) : order.paymentPending ? (
-          <p className="notice notice-warn">PayPal has not confirmed this payment yet. Please don&apos;t ship until it does - this page will say so.</p>
+          <p className="notice notice-warn">PayPal has not confirmed this payment yet. Please do not ship until it does - this page will update when it is confirmed.</p>
         ) : (
           <div className="toolbar">
             {order.status === "SENT" ? (

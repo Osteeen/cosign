@@ -9,9 +9,9 @@ import { RevealSection } from "./reveal-section";
 // versus sandbox.
 
 const HOW = [
-  { title: "Tell it the rules", text: "In your own words: how much, which stores, and when to check with you." },
-  { title: "Set money aside in PayPal", text: "Your budget is reserved, not spent. Nothing is charged until something is bought." },
-  { title: "Your assistant shops", text: "Cosign checks every purchase against your rules, and watches for tricks." },
+  { title: "Tell it the rules", text: "Use your own words: how much, which stores, and when to check with you." },
+  { title: "Set money aside in PayPal", text: "Your budget is set aside, not spent. Nothing is charged until something is bought." },
+  { title: "Your assistant shops", text: "Cosign checks every purchase against your rules and looks for tricks." },
   { title: "You stay in control", text: "Small buys go through. Big ones wait for you. The rest is stopped." },
 ];
 
@@ -86,7 +86,7 @@ export function LandingGuide({ demo }: { demo: boolean }) {
           <h2 id="tour" className="landing-title">
             Try it in 2 minutes
           </h2>
-          <p className="landing-lede">A shared demo with pretend money - nothing real is charged. It&apos;s all set up, so you can watch an assistant shop right away.</p>
+          <p className="landing-lede">A shared demo with pretend money - nothing real is charged. It&apos;s ready to go, so you can watch an assistant shop right away.</p>
           <ol className="tour">
             <li className="tour-step">
               <div>
@@ -116,13 +116,13 @@ export function LandingGuide({ demo }: { demo: boolean }) {
             <li className="tour-step">
               <div>
                 <h3>Make the call</h3>
-                <p>Approve or decline. You see why it was flagged, what the assistant said, and what the same item costs elsewhere.</p>
+                <p>Approve or decline. See why it was flagged, what the assistant said, and what the same item costs elsewhere.</p>
               </div>
             </li>
             <li className="tour-step">
               <div>
                 <h3>See all spending</h3>
-                <p>Every purchase in one table, by assistant or store, with charts.</p>
+                <p>See every purchase in one table, by assistant or store, with charts.</p>
               </div>
               <Link href="/spending" className="button button-quiet">
                 Spending table
@@ -148,7 +148,7 @@ export function LandingGuide({ demo }: { demo: boolean }) {
         <ul className="landing-cards">
           <li className="landing-card">
             <h3>Agent API and SDKs</h3>
-            <p>A REST API (OpenAPI 3.1) to check an allowance, find products and ask to pay. TypeScript, Python and C# SDKs and the docs are generated with APIMatic.</p>
+            <p>A REST API (OpenAPI 3.1) for checking an allowance, finding products, and asking to pay. TypeScript, Python, and C# SDKs and docs are generated with APIMatic.</p>
             <a href={DOCS_URL} className="see-all" target="_blank" rel="noreferrer">
               Open the API docs
             </a>
@@ -156,14 +156,14 @@ export function LandingGuide({ demo }: { demo: boolean }) {
           <li className="landing-card">
             <h3>MCP for Claude</h3>
             <p>
-              Add Cosign to Claude or any MCP client with an agent&apos;s key, and it can check its allowance, search products and pay - always within
+              Add Cosign to Claude or any MCP client with an agent&apos;s key. It can check its allowance, search products, and pay - always within
               the slip.
             </p>
             <code className="landing-code">POST /api/mcp</code>
           </li>
           <li className="landing-card">
             <h3>Prices before buying</h3>
-            <p>Product search shows your stores&apos; prices, what the rules would decide, and like-for-like prices at other retailers (Channel3, judged by AI).</p>
+            <p>Product search shows prices at your stores, what the rules would decide, and like-for-like prices at other retailers (Channel3, judged by AI).</p>
             <code className="landing-code">GET /api/v1/agent/products</code>
           </li>
         </ul>
@@ -175,14 +175,14 @@ export function LandingGuide({ demo }: { demo: boolean }) {
         </h2>
         <ul className="landing-facts">
           <li>
-            <strong>Real PayPal, pretend money.</strong> Every hold, payment and refund is a real call to PayPal&apos;s test system. No real money
+            <strong>Real PayPal, pretend money.</strong> Every hold, payment, and refund is a real call to PayPal&apos;s test system. No real money
             moves.
           </li>
           <li>
-            <strong>The demo stores are PayPal test shops,</strong> set up the way any PayPal business would join.
+            <strong>The demo stores are PayPal test shops,</strong> set up the same way any PayPal business would join.
           </li>
           <li>
-            <strong>The AI is live.</strong> Claude turns your words into rules and checks every purchase; Channel3 brings in prices from other stores.
+            <strong>The AI is live.</strong> Claude turns your words into rules and checks every purchase. Channel3 brings in prices from other stores.
           </li>
         </ul>
         <p className="landing-built">Built with PayPal, Claude, AG Grid, Channel3, APIMatic and Render.</p>
@@ -197,13 +197,13 @@ export function DemoTour() {
     <section className="demo-tour" aria-label="Demo tour">
       <p className="section-label">Demo tour</p>
       <ol>
-        <li>Run the demo bot below, and watch it fall for the hidden note.</li>
-        <li>Approve or decline what&apos;s waiting for you.</li>
+        <li>Run the demo bot below and watch it fall for the hidden note.</li>
+        <li>Approve or decline what is waiting for you.</li>
         <li>
-          Open <Link href="/spending">Spending</Link> for every purchase, live.
+          Open <Link href="/spending">Spending</Link> to see every purchase as it happens.
         </li>
         <li>
-          See the store&apos;s side: <Link href="/shop/bean-supply/orders">Bean Supply&apos;s orders</Link>, and{" "}
+          See the store side: <Link href="/shop/bean-supply/orders">Bean Supply orders</Link> and{" "}
           <Link href="/shop/paper-co/sticky-notes?reveal=1">the hidden note</Link>.
         </li>
       </ol>

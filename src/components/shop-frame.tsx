@@ -27,7 +27,7 @@ export function ShopFrame({ store, children }: { store: DemoStore; children: Rea
         </div>
       </header>
       <p className="shop-banner">
-        <strong>Demo store (PayPal sandbox).</strong> A stand-in for a real PayPal merchant&apos;s website. AI agents order here through Cosign, and PayPal pays
+        <strong>Demo store in the PayPal sandbox.</strong> It stands in for a real PayPal store. AI assistants order here through Cosign, and PayPal pays
         the store.
       </p>
       <main className="shop-main">{children}</main>

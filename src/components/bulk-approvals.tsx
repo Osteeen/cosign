@@ -88,7 +88,7 @@ export function BulkDecisionBar({
               </ul>
               {mode === "approve" && flaggedCount ? (
                 <p className="dialog-warn">
-                  {flaggedCount === 1 ? "One of these was" : `${flaggedCount} of these were`} flagged by the purchase check. Only approve if you expected them.
+                  {flaggedCount === 1 ? "One of these was" : `${flaggedCount} of these were`} flagged by the purchase check. Only approve if you expected {flaggedCount === 1 ? "it" : "them"}.
                 </p>
               ) : null}
               <p>

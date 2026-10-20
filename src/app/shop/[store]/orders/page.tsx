@@ -15,7 +15,7 @@ import { demoOrdersForStore, orderLink } from "@/lib/services/orders";
 export const metadata: Metadata = { title: "Orders received - demo store", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
-const STATUS: Record<string, string> = { SENT: "New", SEEN: "Seen", SHIPPED: "Shipped", CANCELLED: "Cancelled" };
+const STATUS: Record<string, string> = { SENT: "New", SEEN: "Confirmed", SHIPPED: "Shipped", CANCELLED: "Cancelled" };
 
 export default async function DemoStoreOrdersPage({ params }: { params: Promise<{ store: string }> }) {
   const store = findStore((await params).store);
@@ -26,7 +26,7 @@ export default async function DemoStoreOrdersPage({ params }: { params: Promise<
     <ShopFrame store={store}>
       <h1 className="shop-title">Orders received</h1>
       <p className="shop-note">
-        <strong>Store view (demo).</strong> What {store.name} sees when AI agents buy here through Cosign: the items and where to ship them. Only orders
+        <strong>Store view for this demo.</strong> What {store.name} sees when AI assistants buy through Cosign: the items and where to ship them. Only orders
         from the Cosign demo account appear here. A real store gets a private link for each order.
       </p>
       {orders.length === 0 ? (

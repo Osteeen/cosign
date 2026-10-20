@@ -17,7 +17,7 @@ const STAMP: Record<string, { cls: string; label: string }> = {
   APPROVAL_GRANTED: { cls: "allow", label: "Approved" },
   APPROVAL_DENIED: { cls: "deny", label: "Declined" },
   PAYMENT_FAILED: { cls: "deny", label: "Failed" },
-  PAYMENT_UNCONFIRMED: { cls: "ask", label: "Checking" },
+  PAYMENT_UNCONFIRMED: { cls: "ask", label: "Confirming" },
   HOLD_FAILED: { cls: "deny", label: "Failed" },
   HOLD_RELEASE_FAILED: { cls: "ask", label: "Check" },
   PAYMENT_REVERSED: { cls: "deny", label: "Reversed" },
@@ -56,7 +56,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
             {agentName ?? "Your agents"}
           </Link>
           <h1 className="panel-title">{agentName ? `Activity - ${agentName}` : "All activity"}</h1>
-          <p className="panel-text">Every request, decision, payment and change, newest first. The log is permanent: nothing in it can be edited or deleted.</p>
+          <p className="panel-text">Every request, decision, payment and change, newest first. This log is permanent and cannot be changed or deleted.</p>
 
           <nav className="filters" aria-label="Filter activity">
             <div className="chip-row" role="group" aria-label="Type">

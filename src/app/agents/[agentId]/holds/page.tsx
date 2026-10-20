@@ -44,8 +44,8 @@ export default async function ApproveHoldsPage({ params, searchParams }: { param
           <h1 className="panel-title">{renewal ? "Renew the budget" : "Approve the budget holds"}</h1>
           <p className="panel-text">
             {renewal
-              ? `These holds fund the next period, starting ${nextStart}. The current period keeps working until then, and its unspent holds are released when the new one starts.`
-              : `For each store, PayPal holds that store's share of the budget on your PayPal. Money only moves when ${agent.name} buys something you allowed, and it goes straight to the store.`}
+              ? `These holds cover the next period, starting ${nextStart}. The current period continues until then. Any unused holds are released when the new period starts.`
+              : `For each store, PayPal sets aside that store's share of your budget. Money only moves when ${agent.name} buys something you allowed, and it goes straight to the store.`}
           </p>
 
           <ol className="steps" aria-label="Budget holds">
@@ -59,7 +59,7 @@ export default async function ApproveHoldsPage({ params, searchParams }: { param
                       {h.storeName} <span className="tag">Demo store (PayPal sandbox)</span>
                     </span>
                     <span className="step-state">
-                      {state === "done" ? "Held" : state === "current" ? "Next" : state === "failed" ? "PayPal could not open this hold" : "Waiting"}
+                      {state === "done" ? "Held" : state === "current" ? "Next" : state === "failed" ? "PayPal could not set up this hold" : "Waiting"}
                     </span>
                   </span>
                   <span className="mono">{formatUsd(h.amountCents)}</span>
@@ -73,11 +73,11 @@ export default async function ApproveHoldsPage({ params, searchParams }: { param
               <a href={approvalUrl(next.paypalOrderId!)} className="button button-primary">
                 Approve {formatUsd(next.amountCents)} for {next.storeName} in PayPal
               </a>
-              <p className="muted">You will sign in to PayPal (sandbox), approve, and come straight back here for the next store.</p>
+              <p className="muted">Sign in to PayPal sandbox, approve this hold, then come back here for the next store.</p>
             </div>
           ) : (
             <p className="notice notice-warn" role="status">
-              None of the remaining holds could be opened at PayPal. End this slip and write it again to retry.
+              PayPal could not open any remaining holds. End this permission slip and write it again to retry.
             </p>
           )}
           <Link href={`/agents/${agentId}`} className="see-all">

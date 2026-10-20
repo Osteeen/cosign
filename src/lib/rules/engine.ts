@@ -11,6 +11,7 @@ import type {
   LineItem,
   Reason,
 } from "./types.ts";
+import { categoryLabel } from "../categories.ts";
 
 const MAX_CENTS = 10_000_000; // $100,000: far above any slip; guards overflow.
 
@@ -65,7 +66,7 @@ export function evaluate(input: EvaluationInput): Decision {
   }
 
   if (request.total.currency !== rules.currency) {
-    deny.push({ code: "CURRENCY_MISMATCH", message: `Only ${rules.currency} is allowed.` });
+    deny.push({ code: "CURRENCY_MISMATCH", message: `This slip only allows ${rules.currency}.` });
   }
   if (request.total.amountCents !== computedTotalCents) {
     deny.push({ code: "TOTAL_MISMATCH", message: `Total ${usd(request.total.amountCents)} does not match the items (${usd(computedTotalCents)}).` });
@@ -81,7 +82,7 @@ export function evaluate(input: EvaluationInput): Decision {
 
   const offCategory = [...new Set(request.items.map((i) => i.category).filter((c) => !rules.categories.includes(c)))];
   if (offCategory.length > 0) {
-    deny.push({ code: "CATEGORY_NOT_ALLOWED", message: `Not allowed on this slip: ${offCategory.join(", ")}.` });
+    deny.push({ code: "CATEGORY_NOT_ALLOWED", message: `Not allowed on this slip: ${offCategory.map(categoryLabel).join(", ")}.` });
   }
 
   if (computedTotalCents > rules.perPurchaseMaxCents) {

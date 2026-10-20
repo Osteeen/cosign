@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         for await (const event of runDemoBot(agent)) send(event);
       } catch (e) {
         console.error(`[demo-bot] run failed (${e instanceof Error ? e.name : "error"})`);
-        send({ t: "done", text: "The demo bot stopped early. Nothing was charged for anything not marked paid." });
+        send({ t: "done", text: "The demo bot stopped early. Only purchases marked Paid were charged." });
       }
       controller.close();
     },

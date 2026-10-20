@@ -46,7 +46,7 @@ export async function authorizationForCapture(holdId: string, now = new Date()):
         ownerId: hold.ownerId,
         agentId: row.agentId,
         type: "HOLD_REAUTHORIZED",
-        summary: "Renewed a budget hold at PayPal so purchases keep going through",
+        summary: "Renewed a budget hold at PayPal so purchases can keep going through",
       });
     }
     const [fresh] = await db.select({ id: holds.paypalCurrentAuthorizationId }).from(holds).where(eq(holds.id, hold.id));

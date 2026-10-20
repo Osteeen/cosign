@@ -21,6 +21,7 @@ import { createAgent, getAgent, revokeAgent, setAgentPaused } from "@/lib/servic
 import { listStores } from "@/lib/services/stores";
 import { appUrl, ServiceError } from "@/lib/services/common";
 import { CATEGORIES, createSlip, endSlip, renewSlip, setSlipShipTo } from "@/lib/services/slips";
+import { SLIP_FORM_SOURCE } from "@/lib/categories";
 import { archiveAddress, createAddress, updateAddress } from "@/lib/services/addresses";
 import { confirmOrder, markOrderShipped } from "@/lib/services/orders";
 import { clearStaleDemoApprovals, decideApproval } from "@/lib/services/spend";
@@ -45,9 +46,9 @@ export async function createAgentAction(_prev: NewAgentState, form: FormData): P
   const owner = await requireOwner();
   const name = str(form, "name");
   const description = str(form, "description");
-  if (name.length < 1 || name.length > 80) return { status: "error", message: "Give the agent a name of up to 80 characters." };
+  if (name.length < 1 || name.length > 80) return { status: "error", message: "Use up to 80 characters for the agent name." };
   if (description.length > 280) return { status: "error", message: "Keep the description under 280 characters." };
-  if (!rateLimit(`create-agent:${owner.id}`, 10, 60 * 60_000).ok) return { status: "error", message: "That's a lot of new agents at once. Try again in an hour." };
+  if (!rateLimit(`create-agent:${owner.id}`, 10, 60 * 60_000).ok) return { status: "error", message: "You are adding lots of agents. Try again in an hour." };
   let created;
   try {
     created = await createAgent(owner.id, { name, description: description || null });
@@ -83,11 +84,39 @@ export async function revokeAgentAction(form: FormData) {
 
 export type SlipFormState = { status: "idle" } | { status: "error"; message: string };
 
+
+// The slip form checks most limits itself; this puts any that reach the
+// server into plain words instead of the validation library's own text.
+function slipProblem(e: z.ZodError): string {
+  const issue = e.issues[0];
+  const big = issue?.code === "too_big";
+  switch (String(issue?.path[0] ?? "")) {
+    case "periodDays":
+      return "A budget period can be 1 to 28 days.";
+    case "periodBudgetCents":
+      return big ? "Your budget can be up to $10,000.00." : "Your budget must be at least $1.00.";
+    case "perPurchaseMaxCents":
+      return big ? "The limit per purchase can be up to $10,000.00." : "Set a limit per purchase.";
+    case "approveAboveCents":
+      return "The \"ask me above\" amount can be up to $10,000.00.";
+    case "storeIds":
+      return big ? "Choose up to 10 stores." : "Choose at least one store.";
+    case "categories":
+      return "Choose at least one category.";
+    case "sourceText":
+      return big ? "Keep \"In your words\" under 1,000 characters." : "Write at least 3 characters in \"In your words\".";
+    case "allocations":
+      return "Give each selected store at least $1.00.";
+    default:
+      return "Check the slip and try again.";
+  }
+}
+
 export async function createSlipAction(_prev: SlipFormState, form: FormData): Promise<SlipFormState> {
   const owner = await requireOwner();
   const agentId = id(form, "agentId");
   if (isDemoOwner(owner.id)) {
-    return { status: "error", message: "The demo account can't co-sign new slips: each one needs PayPal approvals from a real owner. Try \"Fill in the rules from my words\" to see the AI drafting." };
+    return { status: "error", message: "The demo account cannot co-sign new slips. Each one needs PayPal approval from a real owner. Try \"Fill in the rules from my words\" to see the AI drafting." };
   }
 
   const budget = parseDollars(str(form, "budget"));
@@ -101,7 +130,7 @@ export async function createSlipAction(_prev: SlipFormState, form: FormData): Pr
   const shipToAddressId = str(form, "shipToAddressId") || null;
 
   if (budget === null || perPurchase === null || approveAbove === null) {
-    return { status: "error", message: "Enter amounts in dollars, like 200 or 49.99." };
+    return { status: "error", message: "Enter dollar amounts, like 200 or 49.99." };
   }
   if (!Number.isInteger(periodDays) || periodDays < 1 || periodDays > 28) {
     return { status: "error", message: "A budget period is 1 to 28 days." };
@@ -118,7 +147,7 @@ export async function createSlipAction(_prev: SlipFormState, form: FormData): Pr
     allocations = {};
     for (const [s, v] of shares) {
       const cents = parseDollars(v);
-      if (cents === null || cents < 100) return { status: "error", message: "Give every chosen store an amount of at least $1, or leave them all blank for an even split." };
+      if (cents === null || cents < 100) return { status: "error", message: "Give each selected store at least $1, or leave them all blank for an even split." };
       allocations[s] = cents;
     }
   }
@@ -138,13 +167,13 @@ export async function createSlipAction(_prev: SlipFormState, form: FormData): Pr
       storeIds,
       categories: categories as (typeof CATEGORIES)[number][],
       expiresAt,
-      sourceText: sourceText || "Set by the owner on the slip form",
+      sourceText: sourceText || SLIP_FORM_SOURCE,
       allocations,
       shipToAddressId,
     });
   } catch (e) {
     if (e instanceof ServiceError) return { status: "error", message: e.message };
-    if (e instanceof z.ZodError) return { status: "error", message: e.issues[0]?.message ?? "Check the slip and try again." };
+    if (e instanceof z.ZodError) return { status: "error", message: slipProblem(e) };
     throw e;
   }
   revalidatePath(`/agents/${agentId}`);
@@ -387,13 +416,13 @@ export type DraftResult = { ok: true; draft: SlipDraft } | { ok: false; message:
 // owner reviews the form and co-signs as usual.
 export async function draftSlipAction(agentId: string, words: string): Promise<DraftResult> {
   const owner = await requireOwner();
-  if (!Uuid.safeParse(agentId).success) return { ok: false, message: "Missing agent." };
+  if (!Uuid.safeParse(agentId).success) return { ok: false, message: "We could not find that agent." };
   await getAgent(owner.id, agentId); // only the owner's own agents
   const text = words.trim();
-  if (text.length < 5) return { ok: false, message: "Write a sentence or two about what the agent should buy, first." };
+  if (text.length < 5) return { ok: false, message: "Write a sentence or two about what the agent should buy first." };
   if (text.length > 1000) return { ok: false, message: "Keep it under 1,000 characters." };
   const limited = rateLimit(`draft:${owner.id}`, 10, 60_000);
-  if (!limited.ok) return { ok: false, message: `Too many drafts in a row. Try again in ${limited.retryAfter} seconds.` };
+  if (!limited.ok) return { ok: false, message: `You have made too many drafts in a row. Try again in ${limited.retryAfter} seconds.` };
   const stores = await listStores();
   return draftSlip({ ownerWords: text, stores: stores.map((s) => ({ id: s.id, name: s.name, categories: s.categories })), today: new Date().toISOString().slice(0, 10) });
 }

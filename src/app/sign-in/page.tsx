@@ -41,7 +41,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           <h1 className="panel-title">Sign in to Cosign</h1>
           {reason === "hold" ? (
             <p className="notice notice-warn" role="status">
-              PayPal approved your budget hold. Sign in to finish switching it on - nothing is held until you do.
+              PayPal approved your budget hold. Sign in to turn it on - nothing is set aside until you do.
             </p>
           ) : null}
           <p className="panel-text">Enter your email and we will send you a one-time sign-in link. No password needed.</p>
@@ -70,7 +70,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
                   {error === "email"
                     ? "Enter a full email address, like name@company.com."
                     : error === "demo"
-                      ? "The demo account isn't set up on this server yet."
+                      ? "The demo account is not set up on this server yet."
                       : error === "slow"
                       ? "Too many sign-in emails for now. Use the newest link we sent, or wait a few minutes and try again."
                       : error === "Verification"
@@ -83,7 +83,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           </form>
           {demoEnabled() ? (
             <div className="demo-entry">
-              <p className="panel-text">Judging or just looking? Open the shared demo account - sandbox money only, nothing to set up.</p>
+              <p className="panel-text">Just looking? Open the shared demo account - sandbox money only, nothing to set up.</p>
               <DemoButton />
             </div>
           ) : null}

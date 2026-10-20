@@ -15,7 +15,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
       <div className="narrow panel-stack rise">
         <h1 className="panel-title">Something went wrong</h1>
         <p className="panel-text">
-          This page could not load just now - often a brief connection problem. Nothing was charged and your agents&apos; rules are unchanged.
+          This page could not load just now - often due to a brief connection problem. Nothing was charged and your agents&apos; rules are unchanged.
         </p>
         <div className="hero-actions">
           <button type="button" className="button button-primary" onClick={reset}>

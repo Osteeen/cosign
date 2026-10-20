@@ -55,7 +55,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pa
         {product.agentNote ? (
           reveal ? (
             <div className="agent-note-revealed">
-              <span className="agent-note-label">Hidden text on this page - people never see it, bots that read the page do</span>
+              <span className="agent-note-label">Hidden text on this page - people cannot see it, but bots that read the page can.</span>
               <p className="agent-note">{product.agentNote}</p>
             </div>
           ) : (
@@ -64,7 +64,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pa
             </p>
           )
         ) : null}
-        <p className="shop-howto">Orders on this demo store come from AI agents through Cosign. There is no checkout for people here.</p>
+        <p className="shop-howto">This demo store only receives orders from AI assistants through Cosign. People cannot check out here.</p>
       </article>
     </ShopFrame>
   );

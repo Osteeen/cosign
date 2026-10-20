@@ -20,6 +20,7 @@ import { ServiceError } from "@/lib/services/common";
 import { recentActivity } from "@/lib/services/overview";
 import { getLiveSlip, listSlipHolds, renewalState, rollOverAgentIfDue } from "@/lib/services/slips";
 import { listPendingApprovals, listSpendRequestsForOwner } from "@/lib/services/spend";
+import { categoryLabel, SLIP_FORM_SOURCE } from "@/lib/categories";
 
 // A signature reads like a name: the owner's name, or the letters of their
 // email before the @ ("austin.john337" -> "Austin John").
@@ -31,21 +32,11 @@ function signatureName(name: string | null, email: string): string {
 }
 
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
-const CATEGORY_LABELS: Record<string, string> = {
-  office_supplies: "Office supplies",
-  groceries: "Groceries",
-  food_and_drink: "Food and drink",
-  travel: "Travel",
-  software: "Software",
-  electronics: "Electronics",
-  household: "Household",
-  other: "Other",
-};
 const ORDER_LABEL: Record<string, string> = {
   SENT: "sent to the store",
   SEEN: "confirmed by the store",
   SHIPPED: "shipped",
-  CANCELLED: "cancelled - PayPal did not complete the payment",
+  CANCELLED: "cancelled - PayPal could not complete the payment",
 };
 
 const SPEND_STAMP: Record<string, { cls: string; label: string }> = {
@@ -61,7 +52,7 @@ const HOLD_LABEL: Record<string, string> = {
   ACTIVE: "Held",
   RELEASED: "Released",
   EXPIRED: "Expired",
-  FAILED: "PayPal could not open this hold",
+  FAILED: "PayPal could not set up this hold",
 };
 
 export default async function AgentPage({ params, searchParams }: { params: Promise<{ agentId: string }>; searchParams: Promise<{ notice?: string }> }) {
@@ -127,7 +118,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
               >
                 <p>
                   {agent.status === "PAUSED"
-                    ? "It can spend again within its permission slip."
+                    ? "It can spend again under its permission slip."
                     : "It cannot spend until you resume it. Its budget holds stay in place."}
                 </p>
                 <input type="hidden" name="agentId" value={agentId} />
@@ -142,7 +133,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                 action={revokeAgentAction}
                 tone="danger"
               >
-                <p>Its key stops working at once, waiting purchases are declined, and the rest of every budget hold is released. This cannot be undone.</p>
+                <p>Its key stops working right away, waiting purchases are declined, and the rest of each budget hold is released. This cannot be undone.</p>
                 <input type="hidden" name="agentId" value={agentId} />
               </ConfirmDialog>
             </div>
@@ -154,7 +145,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                 <>
                   <div>
                     <p className="renewal-title">This budget period ends {periodEnd}</p>
-                    <p className="muted">Renew to keep {agent.name} spending with the same rules. If you do nothing, it stops on {periodEnd} and everything still held is released.</p>
+                    <p className="muted">Renew to keep {agent.name} spending with the same rules. If you do nothing, it stops on {periodEnd} and any remaining budget holds are released.</p>
                   </div>
                   <ConfirmDialog
                     trigger="Renew budget"
@@ -165,8 +156,8 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                     action={renewSlipAction}
                   >
                     <p>
-                      Same rules: {formatUsd(slip.periodBudgetCents)} for {slip.periodDays} days, split across the same stores. You approve the new budget holds in
-                      PayPal next. The current period keeps working until {periodEnd}.
+                      Same rules: {formatUsd(slip.periodBudgetCents)} for {slip.periodDays} days, split across the same stores. Next, approve the new budget holds in
+                      PayPal. The current period keeps working until {periodEnd}.
                     </p>
                     <input type="hidden" name="slipId" value={slip.id} />
                     <input type="hidden" name="agentId" value={agentId} />
@@ -174,7 +165,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                 </>
               ) : (
                 <>
-                  <p className="renewal-title">Renewal started - approve the next period&apos;s holds in PayPal</p>
+                  <p className="renewal-title">Renewal started - approve the next period&apos;s budget holds in PayPal</p>
                   <Link href={`/agents/${agentId}/holds`} className="button button-primary">
                     Continue in PayPal
                   </Link>
@@ -216,16 +207,16 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                   <Slip
                     tag={slip.status === "ACTIVE" ? "Active" : "Waiting for holds"}
                     rows={[
-                      { label: "In your words", value: <span className="slip-quote">&ldquo;{slip.sourceText}&rdquo;</span> },
+                      ...(slip.sourceText === SLIP_FORM_SOURCE ? [] : [{ label: "In your words", value: <span className="slip-quote">&ldquo;{slip.sourceText}&rdquo;</span> }]),
                       { label: "Budget", value: `${formatUsd(slip.periodBudgetCents)} every ${slip.periodDays} days` },
                       { label: "Spent", value: `${formatUsd(spent)} this period, ends ${dateFmt.format(slip.currentPeriodEndsAt)}` },
-                      { label: "Per purchase", value: `Up to ${formatUsd(slip.perPurchaseMaxCents)}` },
+                      { label: "Each purchase", value: `Up to ${formatUsd(slip.perPurchaseMaxCents)}` },
                       { label: "Ask me above", value: formatUsd(slip.approveAboveCents) },
-                      { label: "Categories", value: slip.categories.map((c) => CATEGORY_LABELS[c] ?? c).join(", ") },
-                      { label: "Ends", value: slip.expiresAt ? dateFmt.format(slip.expiresAt) : "When you end it" },
+                      { label: "Categories", value: slip.categories.map(categoryLabel).join(", ") },
+                      { label: "Ends", value: slip.expiresAt ? dateFmt.format(slip.expiresAt) : "Until you end it" },
                       {
                         label: "Ships to",
-                        value: shipTo ? `${shipTo.label} - ${shipTo.recipient}, ${addressSummary(shipTo)}` : "No address - nothing to ship",
+                        value: shipTo ? `${shipTo.label} - ${shipTo.recipient}, ${addressSummary(shipTo)}` : "No address - nothing will be shipped",
                       },
                     ]}
                     signedBy={signatureName(owner.name, owner.email)}
@@ -233,7 +224,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                   />
                   {!demo ? (
                     <details className="inline-edit">
-                      <summary className="button button-quiet">Change where orders ship</summary>
+                      <summary className="button button-quiet">Change delivery address</summary>
                       <form action={setShipToAction} className="slip panel-stack">
                         <input type="hidden" name="slipId" value={slip.id} />
                         <input type="hidden" name="agentId" value={agentId} />
@@ -255,7 +246,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                           </div>
                         </fieldset>
                         <p className="field-help">
-                          New orders ship to it. Budget holds already at PayPal keep the address they were opened with.{" "}
+                          New orders ship there. Budget holds already in PayPal keep the address they were opened with.{" "}
                           <Link href={`/addresses?back=/agents/${agentId}`}>Add or edit addresses</Link>
                         </p>
                         <SubmitButton pendingLabel="Saving">Save</SubmitButton>
@@ -271,7 +262,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                     action={endSlipAction}
                     tone="danger"
                   >
-                    <p>The agent stops spending, waiting purchases are declined, and the rest of each budget hold is released at PayPal.</p>
+                    <p>The agent stops spending, waiting purchases are declined, and the rest of each budget hold is released in PayPal.</p>
                     <input type="hidden" name="slipId" value={slip.id} />
                     <input type="hidden" name="agentId" value={agentId} />
                   </ConfirmDialog>
@@ -328,7 +319,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
               ) : (
                 <ul className="decisions">
                   {spends.map(({ spend, storeName }) => {
-                    const stamp = SPEND_STAMP[spend.status] ?? { cls: "ask", label: spend.status };
+                    const stamp = SPEND_STAMP[spend.status] ?? { cls: "ask", label: "In progress" };
                     const items = spend.items as { name: string; quantity: number }[];
                     const reasons = (spend.decision as { reasons: { code: string; message: string }[] }).reasons;
                     return (
@@ -342,7 +333,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                           </span>
                           {orders.get(spend.id) ? (
                             <span className="decision-why">
-                              Order: {orders.get(spend.id)!.paymentPending && orders.get(spend.id)!.status !== "CANCELLED" ? "waiting for PayPal to confirm the payment" : ORDER_LABEL[orders.get(spend.id)!.status]}
+                              Order: {orders.get(spend.id)!.paymentPending && orders.get(spend.id)!.status !== "CANCELLED" ? "waiting for PayPal to confirm payment" : ORDER_LABEL[orders.get(spend.id)!.status]}
                               {orders.get(spend.id)!.status !== "CANCELLED" ? (
                                 <>
                                   {" - "}

@@ -23,8 +23,8 @@ export default async function SpendingPage({ searchParams }: { searchParams: Pro
           <BulkNotice value={bulk} />
           <h1 className="panel-title">Spending</h1>
           <p className="panel-text">
-            Every purchase your agents asked for, and what Cosign did with it. Sort, filter and search; the totals follow your filters.
-            {rows.length === SPENDING_LIMIT ? ` Showing the latest ${SPENDING_LIMIT}.` : ""}
+            Every purchase your AI assistants asked for and what Cosign did. Sort, filter, and search - totals match your filters.
+            {rows.length === SPENDING_LIMIT ? ` Showing the latest ${SPENDING_LIMIT.toLocaleString("en-US")}.` : ""}
           </p>
           <SpendingGrid rows={rows} />
         </div>

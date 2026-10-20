@@ -44,7 +44,7 @@ export const SlipInput = z
     // Where purchases ship (one of the owner's addresses); null = no address.
     shipToAddressId: z.uuid().nullable().optional(),
   })
-  .refine((s) => new Set(s.storeIds).size === s.storeIds.length, { message: "A store is listed twice." })
+  .refine((s) => new Set(s.storeIds).size === s.storeIds.length, { message: "The same store is listed twice." })
   .refine((s) => s.perPurchaseMaxCents <= s.periodBudgetCents, { message: "The per-purchase limit cannot be more than the budget." });
 export type SlipInput = z.infer<typeof SlipInput>;
 
@@ -106,17 +106,17 @@ export async function createSlip(ownerId: string, agentId: string, raw: SlipInpu
       .from(agents)
       .where(and(eq(agents.id, agentId), eq(agents.ownerId, ownerId)))
       .for("update");
-    if (!agent) throw notFound("Agent");
-    if (agent.status === "REVOKED") throw new ServiceError(409, "agent_revoked", "This agent is revoked.");
+    if (!agent) throw new ServiceError(404, "not_found", "We could not find that agent.");
+    if (agent.status === "REVOKED") throw new ServiceError(409, "agent_revoked", "This agent has been revoked.");
 
     const [live] = await tx
       .select({ id: slips.id })
       .from(slips)
       .where(and(eq(slips.agentId, agentId), inArray(slips.status, ["AWAITING_HOLDS", "ACTIVE"])));
-    if (live) throw new ServiceError(409, "slip_exists", "End this agent's current slip before giving it a new one.");
+    if (live) throw new ServiceError(409, "slip_exists", "End this agent's current permission slip before giving it a new one.");
 
     const known = await tx.select({ id: stores.id }).from(stores).where(inArray(stores.id, input.storeIds));
-    if (known.length !== input.storeIds.length) throw new ServiceError(422, "unknown_store", "One of the stores is not available.");
+    if (known.length !== input.storeIds.length) throw new ServiceError(422, "unknown_store", "One of these stores is not available.");
     if (input.shipToAddressId) await assertOwnAddress(tx, ownerId, input.shipToAddressId);
 
     const [slip] = await tx
@@ -284,7 +284,7 @@ export async function recoverWaitingHolds(now = new Date()): Promise<number> {
         ownerId: c.hold.ownerId,
         agentId: c.agentId,
         type: voided ? "HOLD_RELEASED" : "HOLD_RELEASE_FAILED",
-        summary: voided ? "Released a budget hold PayPal had placed after it was closed" : "A budget hold PayPal placed after it was closed could not be released; it will expire on its own",
+        summary: voided ? "Released a budget hold PayPal placed after it was closed" : "A budget hold PayPal placed after it was closed could not be released. It will expire on its own.",
         amountCents: order.placed.amountCents,
         data: { holdId: c.hold.id, recovered: true },
       });
@@ -339,7 +339,7 @@ export async function completeHoldApproval(ownerId: string, orderId: string): Pr
   // refused once PayPal forgets the request ID.
   const placed = order.status === "COMPLETED" && order.placed ? order.placed : await authorizeOrder(orderId);
   if (!["CREATED", "PARTIALLY_CAPTURED", "PENDING"].includes(placed.status)) {
-    throw new ServiceError(409, "hold_closed", "PayPal says this budget hold is no longer live. Nothing is held.");
+    throw new ServiceError(409, "hold_closed", "PayPal says this budget hold is no longer active. Nothing is held.");
   }
   if (placed.payeeMerchantId !== hold.merchantId || placed.amountCents !== hold.hold.amountCents) {
     // Should never happen: refuse to use a hold that differs from what we asked for.
@@ -389,8 +389,8 @@ export async function completeHoldApproval(ownerId: string, orderId: string): Pr
       agentId: hold.agentId,
       type: voided ? "HOLD_RELEASED" : "HOLD_RELEASE_FAILED",
       summary: voided
-        ? "Released a budget hold approved after its permission slip had closed"
-        : "A budget hold approved after its permission slip closed could not be released; it will expire on its own",
+        ? "Released a budget hold approved after its permission slip closed"
+        : "A budget hold approved after its permission slip closed could not be released. It will expire on its own.",
       amountCents: hold.hold.amountCents,
       data: { holdId: hold.hold.id, late: true },
     });
@@ -452,8 +452,8 @@ export async function renewSlip(ownerId: string, slipId: string): Promise<{ agen
       .where(and(eq(slips.id, slipId), eq(slips.ownerId, ownerId)))
       .for("update");
     if (!slip) throw notFound("Permission slip");
-    if (slip.status !== "ACTIVE") throw new ServiceError(409, "slip_not_active", "Only an active slip can be renewed.");
-    if (renewalState(slip).lastPeriod) throw new ServiceError(409, "slip_ends", "This slip ends with the current period, so there is nothing to renew.");
+    if (slip.status !== "ACTIVE") throw new ServiceError(409, "slip_not_active", "Only an active permission slip can be renewed.");
+    if (renewalState(slip).lastPeriod) throw new ServiceError(409, "slip_ends", "This permission slip ends with the current period, so there is nothing to renew.");
     // A hold lasts 29 days from approval: renewing earlier would leave the next
     // period without a usable hold before it ends.
     if (!renewalState(slip).due) throw new ServiceError(409, "renewal_not_due", `You can renew in the last ${RENEWAL_WINDOW_DAYS} days of the period.`);
@@ -470,7 +470,7 @@ export async function renewSlip(ownerId: string, slipId: string): Promise<{ agen
       .insert(holds)
       .values(shares.map((s) => ({ ownerId, slipId, storeId: s.storeId, periodIndex: nextIndex, amountCents: s.allocationCents })))
       .returning();
-    await logActivity(tx, { ownerId, agentId: slip.agentId, type: "SLIP_RENEWAL_STARTED", summary: "Started renewing a budget for the next period" });
+    await logActivity(tx, { ownerId, agentId: slip.agentId, type: "SLIP_RENEWAL_STARTED", summary: "Started renewing the budget for the next period" });
     return { agentId: slip.agentId, newHolds };
   });
   if (created.newHolds.length) await openHoldsAtPayPal(ownerId, created.agentId, created.newHolds);

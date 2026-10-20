@@ -7,17 +7,8 @@ import { createSlipAction, draftSlipAction, type SlipFormState } from "@/app/act
 import { formatUsd, parseDollars } from "@/lib/money";
 import { ConfirmDialog } from "./confirm-dialog";
 import { DatePicker } from "./date-picker";
+import { CATEGORY_LABELS } from "@/lib/categories";
 
-const CATEGORY_LABELS: Record<string, string> = {
-  office_supplies: "Office supplies",
-  groceries: "Groceries",
-  food_and_drink: "Food and drink",
-  travel: "Travel",
-  software: "Software",
-  electronics: "Electronics",
-  household: "Household",
-  other: "Other",
-};
 
 export function SlipForm({
   agentId,
@@ -68,9 +59,9 @@ export function SlipForm({
       setShares({});
       setEndsOn(d.ends_on);
       setErrors({});
-      setDraftNotes({ tone: d.notes.length ? "warn" : "ok", lines: d.notes.length ? d.notes : ["Filled in from your words. Check each field before you co-sign."] });
+      setDraftNotes({ tone: d.notes.length ? "warn" : "ok", lines: d.notes.length ? d.notes : ["Filled in from your words. Check every field before you co-sign."] });
     } catch {
-      setDraftNotes({ tone: "bad", lines: ["Drafting isn't available right now. Fill in the fields yourself."] });
+      setDraftNotes({ tone: "bad", lines: ["Drafting is not available right now. Fill in the fields yourself."] });
     } finally {
       setDrafting(false);
     }
@@ -172,7 +163,7 @@ export function SlipForm({
             <label htmlFor="budget" className="field-label">
               Budget ($)
             </label>
-            <input id="budget" name="budget" className="field-input" inputMode="decimal" pattern="\$?[0-9,]{1,9}(\.[0-9]{1,2})?" title="Enter an amount in dollars, like 200 or 49.99." data-label="budget" {...invalidProps("budget", errors)} value={budget} onChange={(e) => setBudget(e.target.value)} required />
+            <input id="budget" name="budget" className="field-input" inputMode="decimal" pattern="\$?[0-9,]{1,9}(\.[0-9]{1,2})?" title="Enter a dollar amount, like 200 or 49.99." data-label="budget" {...invalidProps("budget", errors)} value={budget} onChange={(e) => setBudget(e.target.value)} required />
             <FieldError name="budget" errors={errors} />
           </div>
           <div className="field">
@@ -186,14 +177,14 @@ export function SlipForm({
             <label htmlFor="perPurchase" className="field-label">
               Per purchase up to ($)
             </label>
-            <input id="perPurchase" name="perPurchase" className="field-input" inputMode="decimal" pattern="\$?[0-9,]{1,9}(\.[0-9]{1,2})?" title="Enter an amount in dollars, like 200 or 49.99." data-label="per-purchase limit" {...invalidProps("perPurchase", errors)} value={perPurchase} onChange={(e) => setPerPurchase(e.target.value)} required />
+            <input id="perPurchase" name="perPurchase" className="field-input" inputMode="decimal" pattern="\$?[0-9,]{1,9}(\.[0-9]{1,2})?" title="Enter a dollar amount, like 200 or 49.99." data-label="per-purchase limit" {...invalidProps("perPurchase", errors)} value={perPurchase} onChange={(e) => setPerPurchase(e.target.value)} required />
             <FieldError name="perPurchase" errors={errors} />
           </div>
           <div className="field">
             <label htmlFor="approveAbove" className="field-label">
               Ask me above ($)
             </label>
-            <input id="approveAbove" name="approveAbove" className="field-input" inputMode="decimal" pattern="\$?[0-9,]{1,9}(\.[0-9]{1,2})?" title="Enter an amount in dollars, like 200 or 49.99." data-label="ask-me-above amount" placeholder="Empty - ask me every time" {...invalidProps("approveAbove", errors)} value={approveAbove} onChange={(e) => setApproveAbove(e.target.value)} />
+            <input id="approveAbove" name="approveAbove" className="field-input" inputMode="decimal" pattern="\$?[0-9,]{1,9}(\.[0-9]{1,2})?" title="Enter a dollar amount, like 200 or 49.99." data-label="ask-me-above amount" placeholder="Leave blank - ask me every time" {...invalidProps("approveAbove", errors)} value={approveAbove} onChange={(e) => setApproveAbove(e.target.value)} />
             <FieldError name="approveAbove" errors={errors} />
           </div>
         </div>
@@ -216,7 +207,7 @@ export function SlipForm({
                     name={`share-${s.id}`}
                     className="field-input share-input"
                     inputMode="decimal"
-                    placeholder={split.has(s.id) && !anyShare ? (split.get(s.id)! / 100).toFixed(2) : "0.00"}
+                    placeholder={split.has(s.id) && !anyShare ? (split.get(s.id)! / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
                     value={shares[s.id] ?? ""}
                     onChange={(e) => setShares({ ...shares, [s.id]: e.target.value })}
                   />
@@ -229,7 +220,7 @@ export function SlipForm({
             {chosen.length === 0
               ? "Choose at least one store."
               : overHeld
-                ? `Store shares add up to ${formatUsd(held)}, more than the ${formatUsd(budgetCents!)} budget.`
+                ? `Store shares total ${formatUsd(held)}, more than the ${formatUsd(budgetCents!)} budget.`
                 : `${anyShare ? "Your split" : "Even split"}: ${formatUsd(held)} held across ${chosen.length} store${chosen.length > 1 ? "s" : ""}.`}
           </p>
         </fieldset>
@@ -249,7 +240,7 @@ export function SlipForm({
 
         <fieldset className="fieldset">
           <legend className="field-label">Ship orders to</legend>
-          <p className="muted field-help">Stores get this address with every paid order, and see it in PayPal. {agentName} only ever sees the label.</p>
+          <p className="muted field-help">Stores get this address with every paid order and see it in PayPal. {agentName} only sees the label.</p>
           <div className="check-grid check-grid-wide">
             {addresses.map((a) => (
               <label className="check" key={a.id}>
@@ -261,7 +252,7 @@ export function SlipForm({
             ))}
             <label className="check">
               <input type="radio" name="shipToAddressId" value="" checked={shipTo === ""} onChange={() => setShipTo("")} />
-              <span>No address - nothing to ship (services, downloads)</span>
+              <span>No address - nothing to ship (services or downloads)</span>
             </label>
           </div>
           <p className="muted">
@@ -287,10 +278,10 @@ export function SlipForm({
           beforeOpen={checkSlip}
         >
           <p>
-            {agentName} may spend up to {budgetCents ? formatUsd(budgetCents) : "the budget"} every {periodDays} days, at most{" "}
-            {formatUsd(parseDollars(perPurchase) ?? 0)} a purchase, and must ask you above {formatUsd(parseDollars(approveAbove) ?? 0)}.
+            {agentName} can spend up to {budgetCents ? formatUsd(budgetCents) : "the budget"} every {periodDays} days, up to{" "}
+            {formatUsd(parseDollars(perPurchase) ?? 0)} per purchase, and must ask you for purchases over {formatUsd(parseDollars(approveAbove) ?? 0)}.
           </p>
-          <p>Next, you approve one PayPal budget hold per store. Money stays on your PayPal until a purchase is paid, and goes straight to the store.</p>
+          <p>Next, approve a PayPal budget hold for each store. Your money stays in PayPal until a purchase is paid, then goes straight to the store.</p>
         </ConfirmDialog>
       </div>
     </form>

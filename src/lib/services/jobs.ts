@@ -78,7 +78,7 @@ export async function runDailyJob(now = new Date()) {
       ownerId: slip.ownerId,
       agentId: slip.agentId,
       type: sent ? "SLIP_RENEWAL_DUE" : "EMAIL_FAILED",
-      summary: sent ? "Emailed you that the budget period ends soon" : "Could not email the renewal reminder; renew from the agent page",
+      summary: sent ? "Emailed you that the budget period ends soon" : "Could not email the renewal reminder. Renew from the agent page.",
       data: sent ? { marker } : undefined,
     });
     if (sent) result.remindersSent++;

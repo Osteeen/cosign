@@ -61,7 +61,7 @@ export async function createAgent(ownerId: string, input: { name: string; descri
       throw new ServiceError(
         422,
         "too_many_agents",
-        isDemoOwner(ownerId) ? "The shared demo has enough agents for now; visitors' agents are cleared daily." : `You can have up to ${max} agents. Revoke one you no longer use first.`,
+        isDemoOwner(ownerId) ? "The shared demo has enough agents for now. Visitor agents are cleared daily." : `You can have up to ${max} agents. Revoke one you no longer use first.`,
       );
     }
     const [agent] = await tx.insert(agents).values({ ownerId, name: input.name, description: input.description }).returning();
@@ -159,7 +159,7 @@ export async function releaseHoldsAtPayPal(
         ownerId,
         agentId,
         type: "HOLD_RELEASE_FAILED",
-        summary: "PayPal did not release a hold yet; Cosign will try again daily",
+        summary: "PayPal has not released a hold yet. Cosign will try again daily.",
         data: { holdId: hold.id },
       });
       continue;
