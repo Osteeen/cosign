@@ -76,7 +76,7 @@ Cosign is a multiparty platform on the PayPal sandbox. Every money movement is a
 | **Partner Referrals** (`/v2/customer/partner-referrals`) | Stores connect to Cosign once through PayPal onboarding; Cosign stores only their merchant ID |
 | **Orders v2 `AUTHORIZE`** with `payee.merchant_id` | One **budget hold** per store, approved by the owner in PayPal (with the ship-to address on the order) |
 | **Payments v2 capture** (`final_capture=false`) | Every allowed purchase is a **partial capture** from the hold - PayPal pays the store directly, with no buyer present |
-| **Payments v2 reauthorize** | After PayPal's 3-day honor period the daily job renews each hold (sending the remaining amount); new captures use the new authorization ID |
+| **Payments v2 reauthorize** | After PayPal's 3-day honor period the daily job renews each hold once (sending the remaining amount; PayPal allows one renewal per hold); new captures use the new authorization ID |
 | **Payments v2 void** (with `PayPal-Auth-Assertion` for the store) | Revoking an agent or ending a period releases what is left, always on the original authorization ID |
 | **Payments v2 refund** (with `PayPal-Auth-Assertion`) | A paid purchase can be refunded on behalf of the store; refund and reversal webhooks are recorded |
 | **Webhooks** | `PAYMENT.CAPTURE.*`, `PAYMENT.AUTHORIZATION.VOIDED`, `CHECKOUT.ORDER.APPROVED`, refunds and reversals, each **signature-verified** locally against PayPal's pinned certificate, and de-duplicated |

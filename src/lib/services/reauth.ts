@@ -12,9 +12,7 @@ import { reauthorizeHold } from "@/lib/paypal/holds";
 import { PayPalError } from "@/lib/paypal/client";
 import { addDays, logActivity } from "./common";
 import { HONOR_PERIOD_DAYS } from "./slips";
-
-// If PayPal says it is too soon (our clock ran ahead of its), wait a while.
-const TOO_SOON_BACKOFF_HOURS = 6;
+import { renewAgainAt } from "./reauth-policy";
 
 // The authorization a new capture on this hold should use, reauthorizing first
 // when the honor period has passed. Never throws for a PayPal problem: if the
@@ -54,19 +52,13 @@ export async function authorizationForCapture(holdId: string, now = new Date()):
     const [fresh] = await db.select({ id: holds.paypalCurrentAuthorizationId }).from(holds).where(eq(holds.id, hold.id));
     return fresh?.id ?? current;
   } catch (e) {
-    if (e instanceof PayPalError && e.issue === "REAUTHORIZATION_TOO_SOON") {
-      await db
-        .update(holds)
-        .set({ honorPeriodEndsAt: new Date(now.getTime() + TOO_SOON_BACKOFF_HOURS * 3_600_000) })
-        .where(eq(holds.id, hold.id));
-    } else {
+    if (!(e instanceof PayPalError && e.issue === "REAUTHORIZATION_TOO_SOON")) {
       console.error(`[reauth] could not renew hold ${hold.id} (${e instanceof PayPalError ? `${e.status} ${e.issue ?? ""}` : e instanceof Error ? e.name : "error"})`);
-      // A definite refusal (e.g. PayPal allows only so many renewals): don't
-      // ask again on every purchase; captures go to the current ID meanwhile.
-      if (e instanceof PayPalError && e.definite) {
-        await db.update(holds).set({ honorPeriodEndsAt: new Date(now.getTime() + 24 * 3_600_000) }).where(eq(holds.id, hold.id));
-      }
     }
+    // When to ask again (never, once PayPal says it renews only once);
+    // captures go to the current ID meanwhile.
+    const retryAt = e instanceof PayPalError ? renewAgainAt({ issue: e.issue, definite: e.definite }, now, hold.expiresAt) : null;
+    if (retryAt) await db.update(holds).set({ honorPeriodEndsAt: retryAt }).where(eq(holds.id, hold.id));
     return current;
   }
 }
