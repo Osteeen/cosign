@@ -17,7 +17,7 @@ Cosign sits in between. You give each assistant a **permission slip**, and Cosig
 
 ## Why now
 
-AI shopping assistants are arriving faster than stores and banks can trust them. In September, Amazon cut off Meta's Muse shopping agent, saying it did not identify itself and Amazon had not agreed to take part. JPMorgan and Schwab block outside agents from moving customers' money, and Schwab's CEO raised the question of who is responsible if something goes wrong. Others are opening up carefully: Shopify lets agents check out while the shopper confirms the total, and Sierra has published a draft standard for agents to identify themselves. ([WinBuzzer, Oct 20, 2026](https://winbuzzer.com/2026/10/20/website-blocks-limit-ai-agents-shopping-and-banking-xcxwbn/))
+AI shopping assistants are arriving faster than stores and banks can trust them. In September, Amazon cut off Meta's Muse shopping agent, saying it did not identify itself and Amazon had not agreed to take part. JPMorgan and Schwab block outside agents from moving customers' money, and Schwab's CEO raised the question of who is responsible if something goes wrong. Others are opening up carefully: Shopify lets agents check out while the shopper confirms the total, and Sierra, working with Meta, has published a draft standard for agents to identify themselves. ([WinBuzzer, Oct 20, 2026](https://winbuzzer.com/2026/10/20/website-blocks-limit-ai-agents-shopping-and-banking-xcxwbn/))
 
 The common thread: stores are wary of agents they can't identify or trust. Cosign is built for exactly that. Every agent purchase is:
 
