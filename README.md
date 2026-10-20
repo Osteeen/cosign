@@ -15,6 +15,17 @@ AI assistants are starting to shop for people. Today an assistant that pays with
 
 Cosign sits in between. You give each assistant a **permission slip**, and Cosign checks every purchase against it before PayPal pays the store.
 
+## Why now
+
+AI shopping assistants are arriving faster than stores and banks can trust them. In September, Amazon cut off Meta's Muse shopping agent, saying it did not identify itself and Amazon had not agreed to take part. JPMorgan and Schwab block outside agents from moving customers' money, and Schwab's CEO raised the question of who is responsible if something goes wrong. Others are opening up carefully: Shopify lets agents check out while the shopper confirms the total, and Sierra has published a draft standard for agents to identify themselves. ([WinBuzzer, Oct 20, 2026](https://winbuzzer.com/2026/10/20/website-blocks-limit-ai-agents-shopping-and-banking-xcxwbn/))
+
+The common thread: stores are wary of agents they can't identify or trust. Cosign is built for exactly that. Every agent purchase is:
+
+- **Identified** - each agent has its own key and a named owner. No shared logins, and the agent never sees a password or card.
+- **Authorised** - checked against a permission slip its owner co-signed; bigger purchases need the owner's OK on the exact cart.
+- **Limited and logged** - budgets, per-purchase limits and allowed stores are enforced before any money moves, and every decision is recorded.
+- **Paid to a store that opted in** - Cosign only pays stores that connected through PayPal onboarding, so the store has always agreed to take part. PayPal pays it directly.
+
 ## How it works (in plain words)
 
 1. **Tell it the rules.** In your own words: how much it can spend, at which stores, and when to check with you. AI turns your words into exact rules; you review them and co-sign.
