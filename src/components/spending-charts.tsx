@@ -140,6 +140,8 @@ export function SpendingCharts({ shown, agentOrder }: { shown: SpendingRow[]; ag
     return {
       data,
       background: { fill: t.sheet },
+      // Room on the right for the value label past the longest bar.
+      padding: { right: 84 },
       theme: { baseTheme: t.dark ? "ag-default-dark" : "ag-default", params: { fontFamily: t.font, foregroundColor: t.ink, backgroundColor: t.sheet, gridLineColor: t.rule, axisLineColor: t.rule } },
       series: [
         {

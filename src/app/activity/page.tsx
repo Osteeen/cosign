@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { z } from "zod";
 import { Topbar } from "@/components/topbar";
+import { LocalTime } from "@/components/local-time";
 import { formatUsd } from "@/lib/money";
 import { requireOwner } from "@/lib/owner";
 import { listAgents } from "@/lib/services/agents";
 import { ACTIVITY_GROUPS, listActivity, type ActivityGroup } from "@/lib/services/overview";
 
-const fmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 
 // Which stamp an event gets, by its group.
 const STAMP: Record<string, { cls: string; label: string }> = {
@@ -100,7 +100,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                 return (
                   <li key={e.id} className="ledger-row">
                     <time className="ledger-time" dateTime={e.occurredAt.toISOString()}>
-                      {fmt.format(e.occurredAt)}
+                      <LocalTime iso={e.occurredAt.toISOString()} withYear />
                     </time>
                     <span className="ledger-stamp">{stamp ? <span className={`stamp stamp-${stamp.cls}`}>{stamp.label}</span> : null}</span>
                     <span className="ledger-what">

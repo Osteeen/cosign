@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { confirmOrderAction, markShippedAction } from "@/app/actions";
 import { Notice } from "@/components/notice";
+import { LocalTime } from "@/components/local-time";
 import { SubmitButton } from "@/components/submit-button";
 import { Wordmark } from "@/components/wordmark";
 import { formatUsd } from "@/lib/money";
@@ -14,7 +15,6 @@ import { openOrderAsStore } from "@/lib/services/orders";
 export const metadata: Metadata = { title: "Order - Cosign", robots: { index: false, follow: false }, referrer: "no-referrer" };
 export const dynamic = "force-dynamic";
 
-const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 const STATUS: Record<string, { cls: string; label: string }> = {
   SENT: { cls: "ask", label: "New" },
   SEEN: { cls: "ask", label: "Confirmed" },
@@ -45,7 +45,7 @@ export default async function StoreOrderPage({ params, searchParams }: { params:
           <div>
             <h1 className="panel-title">Order for {storeName}</h1>
             <p className="panel-text">
-              Paid through PayPal on {dateFmt.format(order.createdAt)} by an AI agent working for a Cosign owner. The payment is in your PayPal account
+              Paid through PayPal on <LocalTime iso={order.createdAt.toISOString()} withYear /> by an AI agent working for a Cosign owner. The payment is in your PayPal account
               with invoice ID <span className="mono">{order.spendRequestId}</span>.
             </p>
           </div>
@@ -98,7 +98,7 @@ export default async function StoreOrderPage({ params, searchParams }: { params:
         {order.status === "CANCELLED" ? (
           <p className="notice notice-bad">PayPal did not complete this payment, so this order is cancelled. Please don&apos;t ship it.</p>
         ) : order.status === "SHIPPED" ? (
-          <p className="notice notice-ok">Marked as shipped{order.shippedAt ? ` on ${dateFmt.format(order.shippedAt)}` : ""}. The owner can see this in Cosign.</p>
+          <p className="notice notice-ok">Marked as shipped{order.shippedAt ? <> on <LocalTime iso={order.shippedAt.toISOString()} withYear /></> : null}. The owner can see this in Cosign.</p>
         ) : order.paymentPending ? (
           <p className="notice notice-warn">PayPal has not confirmed this payment yet. Please don&apos;t ship until it does - this page will say so.</p>
         ) : (

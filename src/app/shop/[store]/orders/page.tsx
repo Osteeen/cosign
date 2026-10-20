@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ShopFrame } from "@/components/shop-frame";
+import { LocalTime } from "@/components/local-time";
 import { demoEnabled } from "@/lib/demo/account";
 import { findStore, storePath } from "@/lib/demo/catalog";
 import { formatUsd } from "@/lib/money";
@@ -14,7 +15,6 @@ import { demoOrdersForStore, orderLink } from "@/lib/services/orders";
 export const metadata: Metadata = { title: "Orders received - demo store", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
-const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const STATUS: Record<string, string> = { SENT: "New", SEEN: "Seen", SHIPPED: "Shipped", CANCELLED: "Cancelled" };
 
 export default async function DemoStoreOrdersPage({ params }: { params: Promise<{ store: string }> }) {
@@ -40,7 +40,7 @@ export default async function DemoStoreOrdersPage({ params }: { params: Promise<
                 <a href={orderLink(order.id)} className="shop-order">
                   <span className="shop-order-what">{items.map((i) => `${i.quantity} x ${i.name}`).join(", ")}</span>
                   <span className="shop-order-meta">
-                    {dateFmt.format(order.createdAt)} - from {agent} - {STATUS[order.status]}
+                    <LocalTime iso={order.createdAt.toISOString()} /> - from {agent} - {STATUS[order.status]}
                   </span>
                   <span className="shop-card-price">{formatUsd(order.totalCents)}</span>
                 </a>

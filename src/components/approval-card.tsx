@@ -1,6 +1,7 @@
 import { decideApprovalAction } from "@/app/actions";
 import { formatUsd } from "@/lib/money";
 import { ConfirmDialog } from "./confirm-dialog";
+import { LocalTime } from "./local-time";
 
 type Item = { name: string; quantity: number; unit_amount_cents: number };
 
@@ -105,7 +106,7 @@ export function ApprovalCard({
         <blockquote>{purpose}</blockquote>
       </figure>
       <p className="approval-expires">
-        Decide by {expiresAt.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}. If you do nothing, it is declined.
+        Decide by <LocalTime iso={expiresAt.toISOString()} />. If you do nothing, it is declined.
       </p>
       <div className="approval-actions">
         <ConfirmDialog trigger="Decline" title="Decline this purchase?" confirmLabel="Decline" pendingLabel="Declining" action={decideApprovalAction} tone="danger">

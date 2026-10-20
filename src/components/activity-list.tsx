@@ -1,6 +1,6 @@
 import { formatUsd } from "@/lib/money";
+import { LocalTime } from "./local-time";
 
-const fmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 export function ActivityList({
   events,
@@ -13,7 +13,7 @@ export function ActivityList({
       {events.map((e) => (
         <li key={e.id} className="activity-item">
           <time className="activity-time" dateTime={e.occurredAt.toISOString()}>
-            {fmt.format(e.occurredAt)}
+            <LocalTime iso={e.occurredAt.toISOString()} />
           </time>
           <span className="activity-summary">{e.summary}</span>
           {e.amountCents != null ? <span className="activity-amount">{formatUsd(e.amountCents)}</span> : <span />}
