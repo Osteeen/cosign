@@ -5,7 +5,7 @@
 **Live demo: [cosign-rd24.onrender.com](https://cosign-rd24.onrender.com)** - press **Try the demo**, no sign-up needed.
 Real PayPal sandbox, pretend money: every hold and payment is a real PayPal API call, and no real money moves.
 
-**Video (under 3 minutes):** link added before submission.
+**Video (under 3 minutes): [watch on YouTube](https://www.youtube.com/watch?v=EE5Yg5Geibg)**
 
 ---
 
