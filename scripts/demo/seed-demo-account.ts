@@ -14,7 +14,7 @@ import { agents, holds, slips, stores, users } from "@/db/schema";
 import { DEMO_OWNER_EMAIL, DEMO_OWNER_ID } from "@/lib/demo/account";
 import { createAgent } from "@/lib/services/agents";
 import { appUrl } from "@/lib/services/common";
-import { createSlip, reopenFailedHolds, setSlipShipTo } from "@/lib/services/slips";
+import { createSlip, reopenFailedHolds, rollOverAgentIfDue, setSlipShipTo } from "@/lib/services/slips";
 import { createAddress, listAddresses } from "@/lib/services/addresses";
 
 // Opening the holds calls PayPal, and PayPal sends the buyer back to APP_URL:
@@ -29,7 +29,7 @@ if (deploy && !process.env.APP_URL?.startsWith("https://")) {
 
 const BOT = "Office procurement bot";
 const SECOND = "Travel booker";
-const WORDS = "Keep us stocked with paper and coffee. $500 every 4 weeks, up to $60 per purchase, and ask me before anything over $50.";
+const WORDS = "Keep us stocked with paper and coffee. $2,000 every 4 weeks, up to $60 per purchase, and ask me before anything over $50.";
 
 await db.insert(users).values({ id: DEMO_OWNER_ID, email: DEMO_OWNER_EMAIL, name: "Demo owner" }).onConflictDoNothing();
 
@@ -60,6 +60,9 @@ if (!demoAddress) {
   console.log('Added the sample address "Demo office"');
 }
 
+// A slip whose period has ended is expired first (and its holds released at
+// PayPal), so a re-seed after the period opens a fresh slip with new holds.
+await rollOverAgentIfDue(bot.id);
 const [live] = await db.select({ id: slips.id, shipTo: slips.shipToAddressId }).from(slips).where(and(eq(slips.agentId, bot.id), inArray(slips.status, ["AWAITING_HOLDS", "ACTIVE"])));
 let slipId = live?.id;
 if (!slipId) {
@@ -67,7 +70,9 @@ if (!slipId) {
   if (demoStores.length !== 2) throw new Error("Seed the demo stores first (pnpm db:seed)");
   const slip = await createSlip(DEMO_OWNER_ID, bot.id, {
     periodDays: 28,
-    periodBudgetCents: 50000,
+    // Large enough that judges running the demo bot many times don't drain a
+    // store's hold (about $19 of coffee per run). Sandbox money only.
+    periodBudgetCents: 200000,
     perPurchaseMaxCents: 6000,
     approveAboveCents: 5000,
     storeIds: demoStores.map((s) => s.id),
